@@ -1,16 +1,25 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.violectra.ideaplugin</id>
-    <name>idea_plugin Template</name>
+    <name>Idea Plugin Exercises</name>
     <vendor>violectra</vendor>
 
     <depends>com.intellij.modules.platform</depends>
 
+    <dependencies>
+        <plugin id="com.intellij.java"/>
+    </dependencies>
+
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.violectra.ideaplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <toolWindow factoryClass="com.github.violectra.ideaplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow" anchor="right"/>
     </extensions>
+
+    <actions>
+        <action id="MyShowBytecodeAction" class="com.github.violectra.ideaplugin.MyShowBytecodeAction">
+        </action>
+    </actions>
 
     <applicationListeners>
         <listener class="com.github.violectra.ideaplugin.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>
