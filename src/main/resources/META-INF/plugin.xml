@@ -14,6 +14,9 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow factoryClass="com.github.violectra.ideaplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow" anchor="right"/>
+        <notificationGroup id="Custom Notification Group"
+                               displayType="BALLOON"
+                               key="notification.my.plugin.name"/>
     </extensions>
 
     <actions>

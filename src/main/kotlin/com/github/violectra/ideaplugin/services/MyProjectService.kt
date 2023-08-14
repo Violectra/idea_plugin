@@ -4,6 +4,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.github.violectra.ideaplugin.MyBundle
+import com.github.violectra.ideaplugin.MyNotifier
 import com.github.violectra.ideaplugin.VirtualFileUtils
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.intellij.ide.highlighter.JavaClassFileType
@@ -30,7 +31,11 @@ class MyProjectService(project: Project) {
     }
 
     fun showBytecode(project: Project, file: PsiFile) {
-        updateText(getTextFromCorrespondingFile(project, file))
+        try {
+            updateText(getTextFromCorrespondingFile(project, file))
+        } catch (e: Exception) {
+            MyNotifier.notifyError(project, e.localizedMessage)
+        }
     }
 
     private fun getTextFromCorrespondingFile(project: Project, file: PsiFile): String {
