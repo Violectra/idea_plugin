@@ -17,6 +17,7 @@
         <notificationGroup id="Custom Notification Group"
                                displayType="BALLOON"
                                key="notification.my.plugin.name"/>
+        <dom.fileMetaData implementation="com.github.violectra.ideaplugin.MyDomFileDescription" rootTagName="root"/>
     </extensions>
 
     <actions>
