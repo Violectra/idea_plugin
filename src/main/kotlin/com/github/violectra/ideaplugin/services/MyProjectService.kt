@@ -16,42 +16,40 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
 import com.intellij.util.xml.DomManager
 import java.io.IOException
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.nio.file.Files
 import java.nio.file.Path
+import javax.swing.tree.DefaultMutableTreeNode
 
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(project: Project) {
-    internal var window: MyToolWindow? = null
+    lateinit var window: MyToolWindow
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
     }
 
-
-    private fun updateText(text: String) {
-        window?.updateText(text)
-    }
-
     fun showBytecode(project: Project, file: PsiFile) {
         try {
-            updateText(readDomXmlFile(project, file))
+            readDomXmlFile(project, file)
         } catch (e: Exception) {
             MyNotifier.notifyError(project, e.message ?: "")
         }
     }
 
-    private fun readDomXmlFile(project: Project, file: PsiFile): String {
+    private fun readDomXmlFile(project: Project, file: PsiFile) {
         val root: Root = getXmlRoot(file, project)
         val rootPath = file.parent?.virtualFile?.toNioPath() ?: throw RuntimeException("Parent folder not found")
         val name = file.name
-        val writer = StringWriter()
-        PrintWriter(writer).use { printWriter ->
-            printNode(root, 0, printWriter, rootPath, project, setOf(name))
+
+        val tag = root.xmlTag?.name
+        val nodeString = nodeString(root, "", tag)
+        val usedSrc = setOf(name)
+        val treeRoot = window.rootNode
+        treeRoot.userObject = nodeString
+        for (child in root.getSubNodes()) {
+            treeRoot.add(convertNode(child, 1, rootPath, project, usedSrc))
         }
-        return writer.toString()
     }
 
     private fun findFile(path: Path, project: Project): PsiFile {
@@ -69,20 +67,19 @@ class MyProjectService(project: Project) {
     } else throw RuntimeException("File type is not XML")
 
 
-    private fun printNode(
+    private fun convertNode(
         root: MyNode,
         indentLevel: Int,
-        writer: PrintWriter,
         rootPath: Path,
         project: Project,
         usedSrc: Set<String>
-    ) {
+    ): DefaultMutableTreeNode {
         val tag = root.xmlTag?.name
         val indent = " ".repeat(indentLevel)
-        writer.println(nodeString(root, indent, tag))
+        val newNode = DefaultMutableTreeNode(nodeString(root, indent, tag))
         if (root is MyNodeWithChildren) {
             for (child in root.getSubNodes()) {
-                printNode(child, indentLevel + 1, writer, rootPath, project, usedSrc)
+                newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc))
             }
         } else if (root is NodeRef) {
             val srcFileName = root.getSrc().value ?: throw RuntimeException("No src for ref")
@@ -91,12 +88,11 @@ class MyProjectService(project: Project) {
             if (file.name !in usedSrc) {
                 val externalRoot: Root = getXmlRoot(file, project)
                 for (child in externalRoot.getSubNodes()) {
-                    printNode(child, indentLevel + 1, writer, rootPath, project, usedSrc + file.name)
+                    newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc + file.name))
                 }
-            } else {
-                writer.println("$indent ...");
             }
         }
+        return newNode
     }
 
     private fun nodeString(
