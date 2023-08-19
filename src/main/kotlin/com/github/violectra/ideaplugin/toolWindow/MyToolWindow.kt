@@ -10,14 +10,17 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JPanel
 import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.DefaultTreeModel
 
 class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Disposable {
-    private var myComponentTree: Tree
-    var rootNode: DefaultMutableTreeNode
+    val myComponentTree: Tree
+    val treeModel: DefaultTreeModel
 
     init {
-        rootNode = DefaultMutableTreeNode("Hi")
-        myComponentTree = Tree(rootNode)
+        val rootNode = DefaultMutableTreeNode("Hi")
+        treeModel = DefaultTreeModel(rootNode)
+
+        myComponentTree = Tree(treeModel)
         val treeScrollPane = ScrollPaneFactory.createScrollPane(myComponentTree)
         treeScrollPane.border = IdeBorderFactory.createBorder(SideBorder.BOTTOM)
         treeScrollPane.preferredSize = Dimension(250, -1)
@@ -25,6 +28,9 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
 //        myComponentTree.cellRenderer = DefaultTreeCellRenderer()
 
     }
+
+
+
     override fun dispose() {
         //todo
     }

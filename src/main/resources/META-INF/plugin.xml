@@ -20,10 +20,11 @@
         <dom.fileMetaData implementation="com.github.violectra.ideaplugin.MyDomFileDescription" rootTagName="root"/>
     </extensions>
 
-    <actions>
-        <action id="MyShowBytecodeAction" class="com.github.violectra.ideaplugin.MyShowBytecodeAction">
-        </action>
-    </actions>
+
+    <projectListeners>
+        <listener class="com.github.violectra.ideaplugin.listeners.MyEditorManagerListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
 
     <applicationListeners>
         <listener class="com.github.violectra.ideaplugin.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>

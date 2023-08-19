@@ -2,21 +2,14 @@ package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
-import com.intellij.ide.highlighter.JavaClassFileType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.CompilerModuleExtension
-import com.intellij.openapi.roots.ModuleRootManager
-import com.intellij.openapi.roots.ProjectFileIndex
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
 import com.intellij.util.xml.DomManager
-import java.io.IOException
-import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
 
@@ -29,7 +22,7 @@ class MyProjectService(project: Project) {
         thisLogger().info(MyBundle.message("projectService", project.name))
     }
 
-    fun showBytecode(project: Project, file: PsiFile) {
+    fun showTree(project: Project, file: PsiFile) {
         try {
             readDomXmlFile(project, file)
         } catch (e: Exception) {
@@ -45,11 +38,14 @@ class MyProjectService(project: Project) {
         val tag = root.xmlTag?.name
         val nodeString = nodeString(root, "", tag)
         val usedSrc = setOf(name)
-        val treeRoot = window.rootNode
-        treeRoot.userObject = nodeString
+
+        val treeRoot = DefaultMutableTreeNode(nodeString)
+        treeRoot.removeAllChildren();
         for (child in root.getSubNodes()) {
             treeRoot.add(convertNode(child, 1, rootPath, project, usedSrc))
         }
+
+        window.treeModel.setRoot(treeRoot)
     }
 
     private fun findFile(path: Path, project: Project): PsiFile {
@@ -116,40 +112,5 @@ class MyProjectService(project: Project) {
     }
 
     private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
-
-    private fun getTextFromCorrespondingFile(project: Project, file: PsiFile): String {
-        val index: ProjectFileIndex = ProjectFileIndex.getInstance(project)
-        val virtualFile = file.virtualFile
-
-        val text = if (virtualFile.fileType is JavaClassFileType) {
-            VirtualFileUtils.read(virtualFile)
-        } else {
-            val classFilePath = findCorrespondingClassPath(index, virtualFile)
-            try {
-                VirtualFileUtils.write(Files.readAllBytes(classFilePath))
-            } catch (e: IOException) {
-                thisLogger().info("Bytecode file not found", e)
-                throw RuntimeException("Bytecode file not found")
-            }
-        }
-        return text
-    }
-
-    private fun findCorrespondingClassPath(
-        index: ProjectFileIndex,
-        virtualFile: VirtualFile
-    ): Path {
-        val module = index.getModuleForFile(virtualFile)
-            ?: throw RuntimeException("No module for virtual file found")
-        val sourceRoot = ModuleRootManager.getInstance(module).getSourceRoots(false)[0]
-        val nioCompilerOutput = CompilerModuleExtension
-            .getInstance(module)?.compilerOutputPath?.toNioPath()
-            ?: throw RuntimeException("No compiler output path found")
-
-        val relativePath = sourceRoot.toNioPath().relativize(virtualFile.toNioPath())
-        val classFileParentPath = nioCompilerOutput.resolve(relativePath).parent
-        return classFileParentPath.resolve(virtualFile.nameWithoutExtension + ".class")
-    }
-
 
 }
