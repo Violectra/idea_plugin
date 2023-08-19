@@ -2,24 +2,39 @@ package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.client.currentSession
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.editor.actionSystem.EditorActionManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.psi.xml.XmlFile
+import com.intellij.util.xml.DomElement
 import com.intellij.util.xml.DomManager
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
 
 
 @Service(Service.Level.PROJECT)
-class MyProjectService(project: Project) {
+class MyProjectService(project: Project): Disposable {
     lateinit var window: MyToolWindow
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
+
+        val messageBusConnection = project.messageBus.connect(this)
+
+        messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
+            FileEditorManager.getInstance(project).getSelectedTextEditor()?.getDocument()?.let {
+                PsiDocumentManager.getInstance(project).getPsiFile(it)?.let { showTree(project, it) }
+            }
+        })
     }
 
     fun showTree(project: Project, file: PsiFile) {
@@ -39,6 +54,7 @@ class MyProjectService(project: Project) {
     }
 
     private fun readDomXmlFile(project: Project, file: PsiFile) {
+
         val root: Root? = getXmlRoot(file, project)
         if (root == null) {
             clearTree(project)
@@ -119,5 +135,8 @@ class MyProjectService(project: Project) {
     }
 
     private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
+    override fun dispose() {
+        TODO("Not yet implemented")
+    }
 
 }
