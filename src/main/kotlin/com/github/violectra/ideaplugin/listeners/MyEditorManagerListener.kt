@@ -3,19 +3,30 @@ package com.github.violectra.ideaplugin.listeners
 import com.github.violectra.ideaplugin.services.MyProjectService
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 
 class MyEditorManagerListener : FileEditorManagerListener {
 
     override fun selectionChanged(event: FileEditorManagerEvent) {
-        super.selectionChanged(event)
-        thisLogger().warn("!!!!! selectionChanged ${event.oldFile?.name} -> ${event.newFile?.name}")
+        if (event.newFile != null) {
+            super.selectionChanged(event)
+            thisLogger().warn("!!!!! selectionChanged -> ${event.newFile.name}")
 
-        val project = event.manager.project
-        val myProjectService = project.service<MyProjectService>()
-        val psiFile = PsiManager.getInstance(project).findFile(event.newFile) ?: throw RuntimeException("Can't find psi")
-        myProjectService.showTree(project, psiFile)
+            val project = event.manager.project
+            val myProjectService = project.service<MyProjectService>()
+            val psiFile = PsiManager.getInstance(project).findFile(event.newFile) ?: return
+            myProjectService.showTree(project, psiFile)
+        }
+    }
+
+    override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+        super.fileClosed(source, file)
+
+        val myProjectService = source.project.service<MyProjectService>()
+        myProjectService.clearTree(source.project)
     }
 }

@@ -24,28 +24,31 @@ class MyProjectService(project: Project) {
 
     fun showTree(project: Project, file: PsiFile) {
         try {
-            readDomXmlFile(project, file)
+            readDomXmlFile(project, file) ?: clearTree(project)
+        } catch (e: Exception) {
+            MyNotifier.notifyError(project, e.message ?: "")
+        }
+    }
+
+    fun clearTree(project: Project) {
+        try {
+            window.treeModel.setRoot(null)
         } catch (e: Exception) {
             MyNotifier.notifyError(project, e.message ?: "")
         }
     }
 
     private fun readDomXmlFile(project: Project, file: PsiFile) {
-        val root: Root = getXmlRoot(file, project)
+        val root: Root? = getXmlRoot(file, project)
+        if (root == null) {
+            clearTree(project)
+            return
+        }
         val rootPath = file.parent?.virtualFile?.toNioPath() ?: throw RuntimeException("Parent folder not found")
         val name = file.name
 
-        val tag = root.xmlTag?.name
-        val nodeString = nodeString(root, "", tag)
-        val usedSrc = setOf(name)
-
-        val treeRoot = DefaultMutableTreeNode(nodeString)
-        treeRoot.removeAllChildren();
-        for (child in root.getSubNodes()) {
-            treeRoot.add(convertNode(child, 1, rootPath, project, usedSrc))
-        }
-
-        window.treeModel.setRoot(treeRoot)
+        val newRoot = convertNode(root, 1, rootPath, project, setOf(name))
+        window.treeModel.setRoot(newRoot)
     }
 
     private fun findFile(path: Path, project: Project): PsiFile {
@@ -60,7 +63,7 @@ class MyProjectService(project: Project) {
     ) = if (file is XmlFile) {
         DomManager.getDomManager(project).getFileElement(file, Root::class.java)?.rootElement
             ?: throw RuntimeException("Root not found")
-    } else throw RuntimeException("File type is not XML")
+    } else null
 
 
     private fun convertNode(
@@ -82,9 +85,13 @@ class MyProjectService(project: Project) {
             val path = rootPath.resolve(srcFileName)
             val file = findFile(path, project)
             if (file.name !in usedSrc) {
-                val externalRoot: Root = getXmlRoot(file, project)
-                for (child in externalRoot.getSubNodes()) {
-                    newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc + file.name))
+                val externalRoot: Root? = getXmlRoot(file, project)
+                if (externalRoot == null) {
+                    MyNotifier.notifyError(project, "Ref file is not XML")
+                } else {
+                    for (child in externalRoot.getSubNodes()) {
+                        newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc + file.name))
+                    }
                 }
             }
         }
