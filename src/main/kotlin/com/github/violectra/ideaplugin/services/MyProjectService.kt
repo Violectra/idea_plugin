@@ -89,9 +89,7 @@ class MyProjectService(project: Project): Disposable {
         project: Project,
         usedSrc: Set<String>
     ): DefaultMutableTreeNode {
-        val tag = root.xmlTag?.name
-        val indent = " ".repeat(indentLevel)
-        val newNode = DefaultMutableTreeNode(nodeString(root, indent, tag))
+        val newNode = DefaultMutableTreeNode(root)
         if (root is MyNodeWithChildren) {
             for (child in root.getSubNodes()) {
                 newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc))
@@ -114,28 +112,7 @@ class MyProjectService(project: Project): Disposable {
         return newNode
     }
 
-    private fun nodeString(
-        root: MyNode,
-        indent: String,
-        tag: String?
-    ) = when (root) {
-        is Root -> "$indent$tag"
-        is NodeRef -> {
-            val srcFileName = root.getSrc().value
-            val id = root.getId().value
-            "$indent$tag[$id, $srcFileName] ${getTitle(root)}"
-        }
-
-        is MyNodeWithIdAttribute -> {
-            val id = root.getId().value
-            "$indent$tag[$id] ${getTitle(root)}"
-        }
-
-        else -> ""
-    }
-
-    private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
-    override fun dispose() {
+   override fun dispose() {
         TODO("Not yet implemented")
     }
 

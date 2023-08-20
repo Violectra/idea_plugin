@@ -1,5 +1,7 @@
 package com.github.violectra.ideaplugin.toolWindow
 
+import com.github.violectra.ideaplugin.*
+import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.ui.*
@@ -10,6 +12,7 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JComponent
 import javax.swing.JPanel
+import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 
@@ -23,6 +26,30 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
 
 
         myComponentTree = Tree(treeModel)
+        myComponentTree.cellRenderer = object : NodeRenderer() {
+            override fun customizeCellRenderer(
+                tree: JTree,
+                value: Any?,
+                selected: Boolean,
+                expanded: Boolean,
+                leaf: Boolean,
+                row: Int,
+                hasFocus: Boolean
+            ) {
+                if (value is DefaultMutableTreeNode) {
+                    val userObject = value.userObject
+                    if (userObject is MyNode) {
+
+                        val newValue = nodeString(userObject)
+                        super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
+                        return
+                    }
+
+                    super.customizeCellRenderer(tree, value, selected, expanded, leaf, row, hasFocus)
+                }
+            }
+        }
+
         val decorator = ToolbarDecorator.createDecorator(myComponentTree).setForcedDnD()
         val treeScrollPane = ScrollPaneFactory.createScrollPane(myComponentTree)
         treeScrollPane.border = IdeBorderFactory.createBorder(SideBorder.BOTTOM)
@@ -32,7 +59,38 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
 
     }
 
-    inner class MyDnDTreeModel(private val rootNode: DefaultMutableTreeNode) : DefaultTreeModel(rootNode), EditableModel, RowsDnDSupport.RefinedDropSupport {
+    private fun nodeString(
+        root: MyNode
+    ): String {
+        val tag = when (root) {
+            is NodeA -> "A"
+            is NodeB -> "B"
+            is NodeRef -> "Ref"
+            else -> "root"
+        }
+
+        return when (root) {
+            is Root -> tag
+            is NodeRef -> {
+                val srcFileName = root.getSrc().value
+                val id = root.getId().value
+                "$tag[$id, $srcFileName] ${getTitle(root)}"
+            }
+
+            is MyNodeWithIdAttribute -> {
+                val id = root.getId().value
+                "$tag[$id] ${getTitle(root)}"
+            }
+
+            else -> ""
+        }
+    }
+
+    private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
+
+
+    inner class MyDnDTreeModel(private val rootNode: DefaultMutableTreeNode) : DefaultTreeModel(rootNode),
+        EditableModel, RowsDnDSupport.RefinedDropSupport {
 
         override fun removeRow(idx: Int) {
         }
@@ -73,7 +131,8 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
             TreeUtil.restoreExpandedPaths(myComponentTree, expandedPaths)
         }
 
-        private fun getNode(row: Int) = myComponentTree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
+        private fun getNode(row: Int) =
+            myComponentTree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
     }
 
 
