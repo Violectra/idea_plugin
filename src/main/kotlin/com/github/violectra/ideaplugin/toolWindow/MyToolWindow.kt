@@ -3,6 +3,7 @@ package com.github.violectra.ideaplugin.toolWindow
 import com.github.violectra.ideaplugin.*
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.project.Project
 import com.intellij.ui.*
 import com.intellij.ui.treeStructure.Tree
@@ -15,6 +16,8 @@ import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.MutableTreeNode
+import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position as DNDPosition
 
 class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Disposable {
     val myComponentTree: Tree
@@ -106,27 +109,71 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
         }
 
         override fun isDropInto(component: JComponent?, oldIndex: Int, newIndex: Int): Boolean {
-            return true
+            val oldNode = getNode(oldIndex)
+            val targetNode = getNode(newIndex)
+            return !targetNode.isNodeSibling(oldNode)
         }
 
         override fun canDrop(
             oldIndex: Int,
             newIndex: Int,
-            position: RowsDnDSupport.RefinedDropSupport.Position
+            position: DNDPosition
         ): Boolean {
-            return true
+            val oldNode = getNode(oldIndex)
+            val targetNode = getNode(newIndex)
+            return oldIndex != newIndex && !targetNode.isNodeAncestor(oldNode)
         }
 
-        override fun drop(oldIndex: Int, newIndex: Int, position: RowsDnDSupport.RefinedDropSupport.Position) {
+        override fun drop(oldIndex: Int, newIndex: Int, position: DNDPosition) {
             val expandedPaths = TreeUtil.collectExpandedPaths(myComponentTree)
 
             val oldNode = getNode(oldIndex)
-            val newNode = getNode(newIndex)
-            if (oldNode.parent == newNode) {
-                insertNodeInto(oldNode, newNode, newNode.childCount - 1)
-            } else {
-                insertNodeInto(oldNode, newNode, if (newNode.childCount == 0) 0 else newNode.childCount)
+            val targetNode = getNode(newIndex)
+            val myOldNode = oldNode.userObject as MyNode
+            val myTargetNode = targetNode.userObject as MyNode
+            when (position) {
+                DNDPosition.BELOW -> {
+
+                    val indexTarget = targetNode.parent.getIndex(targetNode)
+                    val curIndex = targetNode.parent.getIndex(oldNode)
+                    val index = if (indexTarget > curIndex) indexTarget else indexTarget + 1
+                    insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
+                    if (myTargetNode is MyNodeWithChildren) {
+                        WriteCommandAction.runWriteCommandAction(myProject) {
+                            myOldNode.xmlElement?.let {
+                                it.parent.addAfter(it, myTargetNode.xmlElement)
+                                it.parent.deleteChildRange(it, it)
+                            }
+                        }
+                    }
+                }
+
+                DNDPosition.ABOVE -> {
+                    val index = targetNode.parent.getIndex(targetNode)
+                    insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
+                    if (myTargetNode is MyNodeWithChildren) {
+                        WriteCommandAction.runWriteCommandAction(myProject) {
+                            myOldNode.xmlElement?.let {
+                                it.parent.addBefore(it, myTargetNode.xmlElement)
+                                it.parent.deleteChildRange(it, it)
+                            }
+                        }
+                    }
+                }
+
+                DNDPosition.INTO -> {
+                    insertNodeInto(oldNode, targetNode, if (targetNode.childCount == 0) 0 else targetNode.childCount)
+                    if (myTargetNode is MyNodeWithChildren) {
+                        WriteCommandAction.runWriteCommandAction(myProject) {
+                            myOldNode.xmlElement?.let {
+                                myTargetNode.xmlElement?.add(it)
+                                it.parent.deleteChildRange(it, it)
+                            }
+                        }
+                    }
+                }
             }
+
             this.reload()
             TreeUtil.restoreExpandedPaths(myComponentTree, expandedPaths)
         }
