@@ -69,17 +69,26 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
             is NodeA -> "A"
             is NodeB -> "B"
             is NodeRef -> "Ref"
+            is NodeRefWithExternalRoot -> "MyRef"
             else -> "root"
         }
 
         return when (root) {
-            is Root -> tag
+
+            is NodeRefWithExternalRoot -> {
+                val nodeRef = root.ref
+                val srcFileName = nodeRef.getSrc().value
+                val id = nodeRef.getId().value
+                "$tag[$id, $srcFileName] ${getTitle(nodeRef)}"
+            }
+
             is NodeRef -> {
                 val srcFileName = root.getSrc().value
                 val id = root.getId().value
                 "$tag[$id, $srcFileName] ${getTitle(root)}"
             }
 
+            is Root -> tag
             is MyNodeWithIdAttribute -> {
                 val id = root.getId().value
                 "$tag[$id] ${getTitle(root)}"
@@ -125,24 +134,31 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
         }
 
         override fun drop(oldIndex: Int, newIndex: Int, position: DNDPosition) {
-            val expandedPaths = TreeUtil.collectExpandedPaths(myComponentTree)
-
+            if (oldIndex == newIndex) {
+               return
+            }
             val oldNode = getNode(oldIndex)
             val targetNode = getNode(newIndex)
-            val myOldNode = oldNode.userObject as MyNode
+            if (oldNode.parent == targetNode) {
+                return
+            }
+            val expandedPaths = TreeUtil.collectExpandedPaths(myComponentTree)
+            val myOldNodeOrigin = oldNode.userObject as MyNode
+            val myOldNode = if (myOldNodeOrigin is NodeRefWithExternalRoot) myOldNodeOrigin.ref else myOldNodeOrigin
             val myTargetNode = targetNode.userObject as MyNode
             when (position) {
                 DNDPosition.BELOW -> {
-
                     val indexTarget = targetNode.parent.getIndex(targetNode)
                     val curIndex = targetNode.parent.getIndex(oldNode)
                     val index = if (indexTarget > curIndex) indexTarget else indexTarget + 1
                     insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
                     if (myTargetNode is MyNodeWithChildren) {
                         WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let {
-                                it.parent.addAfter(it, myTargetNode.xmlElement)
-                                it.parent.deleteChildRange(it, it)
+                            myOldNode.xmlElement?.let { cur ->
+                                myTargetNode.xmlElement?.parent?.let { targetParent ->
+                                    targetParent.addAfter(cur, myTargetNode.xmlElement)
+                                    cur.parent.deleteChildRange(cur, cur)
+                                }
                             }
                         }
                     }
@@ -153,9 +169,11 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
                     insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
                     if (myTargetNode is MyNodeWithChildren) {
                         WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let {
-                                it.parent.addBefore(it, myTargetNode.xmlElement)
-                                it.parent.deleteChildRange(it, it)
+                            myOldNode.xmlElement?.let { cur ->
+                                myTargetNode.xmlElement?.parent?.let { targetParent ->
+                                    targetParent.addBefore(cur, myTargetNode.xmlElement)
+                                    cur.parent.deleteChildRange(cur, cur)
+                                }
                             }
                         }
                     }
@@ -165,9 +183,9 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
                     insertNodeInto(oldNode, targetNode, if (targetNode.childCount == 0) 0 else targetNode.childCount)
                     if (myTargetNode is MyNodeWithChildren) {
                         WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let {
-                                myTargetNode.xmlElement?.add(it)
-                                it.parent.deleteChildRange(it, it)
+                            myOldNode.xmlElement?.let { cur ->
+                                myTargetNode.xmlElement?.add(cur)
+                                cur.parent.deleteChildRange(cur, cur)
                             }
                         }
                     }

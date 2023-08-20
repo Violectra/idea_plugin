@@ -3,10 +3,8 @@ package com.github.violectra.ideaplugin.services
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.client.currentSession
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.editor.actionSystem.EditorActionManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -15,7 +13,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.psi.xml.XmlFile
-import com.intellij.util.xml.DomElement
 import com.intellij.util.xml.DomManager
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
@@ -89,8 +86,9 @@ class MyProjectService(project: Project): Disposable {
         project: Project,
         usedSrc: Set<String>
     ): DefaultMutableTreeNode {
-        val newNode = DefaultMutableTreeNode(root)
+        val newNode: DefaultMutableTreeNode
         if (root is MyNodeWithChildren) {
+            newNode = DefaultMutableTreeNode(root)
             for (child in root.getSubNodes()) {
                 newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc))
             }
@@ -101,13 +99,19 @@ class MyProjectService(project: Project): Disposable {
             if (file.name !in usedSrc) {
                 val externalRoot: Root? = getXmlRoot(file, project)
                 if (externalRoot == null) {
+                    newNode = DefaultMutableTreeNode(root)
                     MyNotifier.notifyError(project, "Ref file is not XML")
                 } else {
+                    newNode = DefaultMutableTreeNode(NodeRefWithExternalRoot(externalRoot, root))
                     for (child in externalRoot.getSubNodes()) {
                         newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc + file.name))
                     }
                 }
+            } else {
+                newNode = DefaultMutableTreeNode(root)
             }
+        } else {
+            throw RuntimeException("Unknown node")
         }
         return newNode
     }
