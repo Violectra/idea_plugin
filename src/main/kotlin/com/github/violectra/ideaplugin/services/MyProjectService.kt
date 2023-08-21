@@ -27,10 +27,14 @@ class MyProjectService(project: Project) : Disposable {
         thisLogger().info(MyBundle.message("projectService", project.name))
 
         val messageBusConnection = project.messageBus.connect(this)
+        val fileEditorManager = FileEditorManager.getInstance(project)
+        val psiDocumentManager = PsiDocumentManager.getInstance(project)
 
         messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
-            FileEditorManager.getInstance(project).selectedTextEditor?.document?.let {
-                PsiDocumentManager.getInstance(project).getPsiFile(it)?.let { psi -> showTree(project, psi) }
+            fileEditorManager.selectedTextEditor?.document?.let {
+                psiDocumentManager.getPsiFile(it)?.let { psi ->
+                    showTree(project, psi)
+                }
             }
         })
     }
@@ -52,22 +56,21 @@ class MyProjectService(project: Project) : Disposable {
     }
 
     private fun readDomXmlFile(project: Project, file: PsiFile) {
-        val root: Root? = getXmlRoot(file, project)
-        if (root == null) {
-            clearTree(project)
-            return
-        }
-        val rootPath = file.parent?.virtualFile?.toNioPath() ?: throw RuntimeException("Parent folder not found")
-        val name = file.name
+        val parentFilePath = file.virtualFile.toNioPath().parent
+        val usedSrc = setOf(file.name)
 
-        val newRoot = convertNode(root, 1, rootPath, project, setOf(name))
-        window.treeModel.setRoot(newRoot)
+        val root: Root? = getXmlRoot(file, project)
+        val treeRootNode = if (root != null) {
+            convertToTreeNode(root, parentFilePath, project, usedSrc)
+        } else null
+
+        window.treeModel.setRoot(treeRootNode)
     }
 
-    private fun findFile(path: Path, project: Project): PsiFile {
-        val file =
-            VirtualFileManager.getInstance().findFileByNioPath(path) ?: throw RuntimeException("No internal file found")
-        return PsiManager.getInstance(project).findFile(file) ?: throw RuntimeException("No internal file found")
+    private fun findInternalRefFile(path: Path, project: Project): PsiFile {
+        return VirtualFileManager.getInstance().findFileByNioPath(path)
+            ?.let { PsiManager.getInstance(project).findFile(it) }
+            ?: throw RuntimeException("No internal ref file found")
     }
 
     private fun getXmlRoot(
@@ -75,14 +78,12 @@ class MyProjectService(project: Project) : Disposable {
         project: Project
     ) = if (file is XmlFile) {
         DomManager.getDomManager(project).getFileElement(file, Root::class.java)?.rootElement
-            ?: throw RuntimeException("Root not found")
     } else null
 
 
-    private fun convertNode(
+    private fun convertToTreeNode(
         root: MyNode,
-        indentLevel: Int,
-        rootPath: Path,
+        parentFilePath: Path,
         project: Project,
         usedSrc: Set<String>
     ): DefaultMutableTreeNode {
@@ -90,21 +91,21 @@ class MyProjectService(project: Project) : Disposable {
         if (root is MyNodeWithChildren) {
             newNode = DefaultMutableTreeNode(root)
             for (child in root.getSubNodes()) {
-                newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc))
+                newNode.add(convertToTreeNode(child, parentFilePath, project, usedSrc))
             }
         } else if (root is NodeRef) {
             val srcFileName = root.getSrc().value ?: throw RuntimeException("No src for ref")
-            val path = rootPath.resolve(srcFileName)
-            val file = findFile(path, project)
+            val path = parentFilePath.resolve(srcFileName)
+            val file = findInternalRefFile(path, project)
             if (file.name !in usedSrc) {
                 val externalRoot: Root? = getXmlRoot(file, project)
                 if (externalRoot == null) {
                     newNode = DefaultMutableTreeNode(root)
-                    MyNotifier.notifyError(project, "Ref file is not XML")
+                    MyNotifier.notifyError(project, "Ref file is not XML or doesn't have root element")
                 } else {
                     newNode = DefaultMutableTreeNode(NodeRefWithExternalRoot(externalRoot, root))
                     for (child in externalRoot.getSubNodes()) {
-                        newNode.add(convertNode(child, indentLevel + 1, rootPath, project, usedSrc + file.name))
+                        newNode.add(convertToTreeNode(child, parentFilePath, project, usedSrc + file.name))
                     }
                 }
             } else {
@@ -117,7 +118,7 @@ class MyProjectService(project: Project) : Disposable {
     }
 
     override fun dispose() {
-        TODO("Not yet implemented")
+        window.dispose()
     }
 
 }
