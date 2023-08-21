@@ -85,13 +85,13 @@ class MyProjectService(project: Project) : Disposable {
                 ?.let { findPsiFileByPath(it, project) }
                 ?.takeIf { it.name !in usedSrc }
                 ?.let { getXmlRoot(it, project) }
-                ?.let { root -> NodeRefWithExternalRoot(root, node) } ?: node
+                ?.let { root -> RootWithExternalRef(root, node) } ?: node
         } else {
             node
         }
         val treeNode = DefaultMutableTreeNode(newNode)
-        val updatedUsedSrc = if (newNode is NodeRefWithExternalRoot) {
-            newNode.ref.getSrc().value?.let { usedSrc + it } ?: usedSrc
+        val updatedUsedSrc = if (newNode is RootWithExternalRef) {
+            newNode.nodeRef.getSrc().value?.let { usedSrc + it } ?: usedSrc
         } else usedSrc
         if (newNode is MyNodeWithChildren) {
             for (child in newNode.getSubNodes()) {

@@ -1,6 +1,9 @@
 package com.github.violectra.ideaplugin.toolWindow
 
 import com.github.violectra.ideaplugin.model.*
+import com.github.violectra.ideaplugin.utils.MyNodeUtils
+import com.github.violectra.ideaplugin.utils.NodeUtils
+import com.github.violectra.ideaplugin.utils.XmlUtils
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
@@ -19,187 +22,122 @@ import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.MutableTreeNode
 import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position as DNDPosition
 
-class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Disposable {
-    val myComponentTree: Tree
+class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
+
+    internal val tree: Tree
     val treeModel: DefaultTreeModel
 
     init {
-        val rootNode = DefaultMutableTreeNode("Hi")
-        treeModel = MyDnDTreeModel(rootNode)
+        treeModel = MyDndTreeModel(null)
+        tree = Tree(treeModel)
+        tree.cellRenderer = CustomCellRenderer()
 
-
-        myComponentTree = Tree(treeModel)
-        myComponentTree.cellRenderer = object : NodeRenderer() {
-            override fun customizeCellRenderer(
-                tree: JTree,
-                value: Any?,
-                selected: Boolean,
-                expanded: Boolean,
-                leaf: Boolean,
-                row: Int,
-                hasFocus: Boolean
-            ) {
-                if (value is DefaultMutableTreeNode) {
-                    val userObject = value.userObject
-                    if (userObject is MyNode) {
-
-                        val newValue = nodeString(userObject)
-                        super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
-                        return
-                    }
-
-                    super.customizeCellRenderer(tree, value, selected, expanded, leaf, row, hasFocus)
-                }
-            }
-        }
-
-        val decorator = ToolbarDecorator.createDecorator(myComponentTree).setForcedDnD()
-        val treeScrollPane = ScrollPaneFactory.createScrollPane(myComponentTree)
+        val treeDecorator = ToolbarDecorator.createDecorator(tree).setForcedDnD()
+        val treeScrollPane = ScrollPaneFactory.createScrollPane(tree)
         treeScrollPane.border = IdeBorderFactory.createBorder(SideBorder.BOTTOM)
         treeScrollPane.preferredSize = Dimension(250, -1)
-        add(decorator.createPanel())
-//        myComponentTree.cellRenderer = DefaultTreeCellRenderer()
 
+        add(treeDecorator.createPanel())
     }
 
-    private fun nodeString(
-        root: MyNode
-    ): String {
-        val tag = when (root) {
-            is NodeA -> "A"
-            is NodeB -> "B"
-            is NodeRef -> "Ref"
-            is NodeRefWithExternalRoot -> "MyRef"
-            else -> "root"
-        }
 
-        return when (root) {
-
-            is NodeRefWithExternalRoot -> {
-                val nodeRef = root.ref
-                val srcFileName = nodeRef.getSrc().value
-                val id = nodeRef.getId().value
-                "$tag[$id, $srcFileName] ${getTitle(nodeRef)}"
-            }
-
-            is NodeRef -> {
-                val srcFileName = root.getSrc().value
-                val id = root.getId().value
-                "$tag[$id, $srcFileName] ${getTitle(root)}"
-            }
-
-            is Root -> tag
-            is MyNodeWithIdAttribute -> {
-                val id = root.getId().value
-                "$tag[$id] ${getTitle(root)}"
-            }
-
-            else -> ""
-        }
-    }
-
-    private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
-
-
-    inner class MyDnDTreeModel(rootNode: DefaultMutableTreeNode) : DefaultTreeModel(rootNode),
-        EditableModel, RowsDnDSupport.RefinedDropSupport {
+    inner class MyDndTreeModel(rootNode: DefaultMutableTreeNode?) : DefaultTreeModel(rootNode), EditableModel,
+        RowsDnDSupport.RefinedDropSupport {
 
         override fun removeRow(idx: Int) {
+            // not used, but EditableModel is required for DnD enabling
         }
 
         override fun addRow() {
+            // not used, but EditableModel is required for DnD enabling
         }
 
         override fun exchangeRows(oldIndex: Int, newIndex: Int) {
+            // not used, but EditableModel is required for DnD enabling
         }
 
         override fun canExchangeRows(oldIndex: Int, newIndex: Int): Boolean {
+            // not used, but EditableModel is required for DnD enabling
             return false
         }
 
         override fun isDropInto(component: JComponent?, oldIndex: Int, newIndex: Int): Boolean {
-            val oldNode = getNode(oldIndex)
-            val targetNode = getNode(newIndex)
-            return !targetNode.isNodeSibling(oldNode)
+            return true
         }
 
         override fun canDrop(
-            oldIndex: Int,
-            newIndex: Int,
-            position: DNDPosition
+            oldIndex: Int, newIndex: Int, position: DNDPosition
         ): Boolean {
+            if (oldIndex == newIndex) return false
+
             val oldNode = getNode(oldIndex)
             val targetNode = getNode(newIndex)
-            return oldIndex != newIndex && !targetNode.isNodeAncestor(oldNode)
+            return !targetNode.isNodeAncestor(oldNode) && (targetNode.userObject !is NodeRef)
         }
 
-        override fun drop(oldIndex: Int, newIndex: Int, position: DNDPosition) {
-            if (oldIndex == newIndex) {
-               return
-            }
-            val oldNode = getNode(oldIndex)
-            val targetNode = getNode(newIndex)
-            if (oldNode.parent == targetNode) {
-                return
-            }
-            val expandedPaths = TreeUtil.collectExpandedPaths(myComponentTree)
-            val myOldNodeOrigin = oldNode.userObject as MyNode
-            val myOldNode = if (myOldNodeOrigin is NodeRefWithExternalRoot) myOldNodeOrigin.ref else myOldNodeOrigin
-            val myTargetNode = targetNode.userObject as MyNode
-            when (position) {
-                DNDPosition.BELOW -> {
-                    val indexTarget = targetNode.parent.getIndex(targetNode)
-                    val curIndex = targetNode.parent.getIndex(oldNode)
-                    val index = if (indexTarget > curIndex) indexTarget else indexTarget + 1
-                    insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
-                    if (myTargetNode is MyNodeWithChildren) {
-                        WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let { cur ->
-                                myTargetNode.xmlElement?.parent?.let { targetParent ->
-                                    targetParent.addAfter(cur, myTargetNode.xmlElement)
-                                    cur.parent.deleteChildRange(cur, cur)
-                                }
-                            }
-                        }
-                    }
-                }
+        override fun drop(currentTreeIndex: Int, targetTreeIndex: Int, position: DNDPosition) {
+            val expandedPaths = TreeUtil.collectExpandedPaths(tree)
 
-                DNDPosition.ABOVE -> {
-                    val index = targetNode.parent.getIndex(targetNode)
-                    insertNodeInto(oldNode, targetNode.parent as MutableTreeNode, index)
-                    if (myTargetNode is MyNodeWithChildren) {
-                        WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let { cur ->
-                                myTargetNode.xmlElement?.parent?.let { targetParent ->
-                                    targetParent.addBefore(cur, myTargetNode.xmlElement)
-                                    cur.parent.deleteChildRange(cur, cur)
-                                }
-                            }
-                        }
-                    }
-                }
+            val curTreeNode = getNode(currentTreeIndex)
+            val targetTreeNode = getNode(targetTreeIndex)
 
-                DNDPosition.INTO -> {
-                    insertNodeInto(oldNode, targetNode, if (targetNode.childCount == 0) 0 else targetNode.childCount)
-                    if (myTargetNode is MyNodeWithChildren) {
-                        WriteCommandAction.runWriteCommandAction(myProject) {
-                            myOldNode.xmlElement?.let { cur ->
-                                myTargetNode.xmlElement?.add(cur)
-                                cur.parent.deleteChildRange(cur, cur)
-                            }
-                        }
-                    }
-                }
-            }
+            insertTreeNode(curTreeNode, targetTreeNode, position)
+            insertXmlElement(curTreeNode, targetTreeNode, position)
 
             this.reload()
-            TreeUtil.restoreExpandedPaths(myComponentTree, expandedPaths)
+            TreeUtil.restoreExpandedPaths(tree, expandedPaths)
         }
 
-        private fun getNode(row: Int) =
-            myComponentTree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
+        private fun insertTreeNode(
+            curTreeNode: DefaultMutableTreeNode,
+            targetTreeNode: DefaultMutableTreeNode,
+            position: RowsDnDSupport.RefinedDropSupport.Position
+        ) {
+            if (position == DNDPosition.INTO) {
+                val intoIndex = if (targetTreeNode.childCount == 0) 0 else targetTreeNode.childCount
+                insertNodeInto(curTreeNode, targetTreeNode, intoIndex)
+            } else {
+                val intoIndex = NodeUtils.calculateIndexWithPosition(targetTreeNode, curTreeNode, position)
+                insertNodeInto(curTreeNode, targetTreeNode.parent as MutableTreeNode, intoIndex)
+            }
+        }
+
+        private fun insertXmlElement(
+            currentTreeNode: DefaultMutableTreeNode,
+            targetTreeNode: DefaultMutableTreeNode,
+            position: RowsDnDSupport.RefinedDropSupport.Position
+        ) {
+            val current = getMovableNode(currentTreeNode)
+            val target = targetTreeNode.userObject as MyNode
+            WriteCommandAction.runWriteCommandAction(project) {
+                if (position == DNDPosition.INTO) {
+                    XmlUtils.xmlInsertInto(current.xmlElement, target.xmlElement)
+                } else {
+                    XmlUtils.xmlInsertIntoPosition(current.xmlElement, target.xmlElement, position)
+                }
+            }
+        }
+
+        private fun getMovableNode(treeNode: DefaultMutableTreeNode): MyNode {
+            val node = treeNode.userObject as MyNode
+            return if (node is RootWithExternalRef) node.nodeRef else node
+        }
+
+        private fun getNode(row: Int) = tree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
+
     }
 
+    inner class CustomCellRenderer : NodeRenderer() {
+        override fun customizeCellRenderer(
+            tree: JTree, value: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
+        ) {
+            val newValue = if (value is DefaultMutableTreeNode) {
+                val userObject = value.userObject
+                if (userObject is MyNode) MyNodeUtils.nodeToString(userObject) else value
+            } else value
+            super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
+        }
+    }
 
     override fun dispose() {
         //todo
