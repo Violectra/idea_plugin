@@ -1,6 +1,7 @@
 package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
+import com.github.violectra.ideaplugin.model.*
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
@@ -19,7 +20,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 
 
 @Service(Service.Level.PROJECT)
-class MyProjectService(project: Project): Disposable {
+class MyProjectService(project: Project) : Disposable {
     lateinit var window: MyToolWindow
 
     init {
@@ -28,15 +29,15 @@ class MyProjectService(project: Project): Disposable {
         val messageBusConnection = project.messageBus.connect(this)
 
         messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
-            FileEditorManager.getInstance(project).getSelectedTextEditor()?.getDocument()?.let {
-                PsiDocumentManager.getInstance(project).getPsiFile(it)?.let { showTree(project, it) }
+            FileEditorManager.getInstance(project).selectedTextEditor?.document?.let {
+                PsiDocumentManager.getInstance(project).getPsiFile(it)?.let { psi -> showTree(project, psi) }
             }
         })
     }
 
     fun showTree(project: Project, file: PsiFile) {
         try {
-            readDomXmlFile(project, file) ?: clearTree(project)
+            readDomXmlFile(project, file)
         } catch (e: Exception) {
             MyNotifier.notifyError(project, e.message ?: "")
         }
@@ -51,7 +52,6 @@ class MyProjectService(project: Project): Disposable {
     }
 
     private fun readDomXmlFile(project: Project, file: PsiFile) {
-
         val root: Root? = getXmlRoot(file, project)
         if (root == null) {
             clearTree(project)
@@ -116,7 +116,7 @@ class MyProjectService(project: Project): Disposable {
         return newNode
     }
 
-   override fun dispose() {
+    override fun dispose() {
         TODO("Not yet implemented")
     }
 

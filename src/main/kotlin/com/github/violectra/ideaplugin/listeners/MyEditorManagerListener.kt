@@ -2,7 +2,6 @@ package com.github.violectra.ideaplugin.listeners
 
 import com.github.violectra.ideaplugin.services.MyProjectService
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -14,7 +13,6 @@ class MyEditorManagerListener : FileEditorManagerListener {
     override fun selectionChanged(event: FileEditorManagerEvent) {
         if (event.newFile != null) {
             super.selectionChanged(event)
-            thisLogger().warn("!!!!! selectionChanged -> ${event.newFile.name}")
 
             val project = event.manager.project
             val myProjectService = project.service<MyProjectService>()

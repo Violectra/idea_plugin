@@ -1,6 +1,6 @@
 package com.github.violectra.ideaplugin.toolWindow
 
-import com.github.violectra.ideaplugin.*
+import com.github.violectra.ideaplugin.model.*
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
@@ -101,7 +101,7 @@ class MyToolWindow(private val myProject: Project) : JPanel(BorderLayout()), Dis
     private fun getTitle(root: MyNodeWithIdAttribute) = root.getTitle().value ?: root.getValue()
 
 
-    inner class MyDnDTreeModel(private val rootNode: DefaultMutableTreeNode) : DefaultTreeModel(rootNode),
+    inner class MyDnDTreeModel(rootNode: DefaultMutableTreeNode) : DefaultTreeModel(rootNode),
         EditableModel, RowsDnDSupport.RefinedDropSupport {
 
         override fun removeRow(idx: Int) {

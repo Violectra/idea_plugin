@@ -1,14 +1,10 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.violectra.ideaplugin</id>
-    <name>Idea Plugin Exercises</name>
+    <name>Idea Extension Exercises</name>
     <vendor>violectra</vendor>
 
     <depends>com.intellij.modules.platform</depends>
-
-    <dependencies>
-        <plugin id="com.intellij.java"/>
-    </dependencies>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
@@ -20,13 +16,8 @@
         <dom.fileMetaData implementation="com.github.violectra.ideaplugin.MyDomFileDescription" rootTagName="root"/>
     </extensions>
 
-
     <projectListeners>
         <listener class="com.github.violectra.ideaplugin.listeners.MyEditorManagerListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
-
-    <applicationListeners>
-        <listener class="com.github.violectra.ideaplugin.listeners.MyApplicationActivationListener" topic="com.intellij.openapi.application.ApplicationActivationListener"/>
-    </applicationListeners>
 </idea-plugin>
