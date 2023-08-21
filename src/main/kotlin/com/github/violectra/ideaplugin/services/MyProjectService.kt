@@ -41,7 +41,7 @@ class MyProjectService(project: Project) : Disposable {
 
     fun showTree(project: Project, file: PsiFile) {
         try {
-            readDomXmlFile(project, file)
+            window.treeModel.setRoot(readFileToTree(project, file))
         } catch (e: Exception) {
             MyNotifier.notifyError(project, e.message ?: "")
         }
@@ -55,22 +55,15 @@ class MyProjectService(project: Project) : Disposable {
         }
     }
 
-    private fun readDomXmlFile(project: Project, file: PsiFile) {
+    private fun readFileToTree(project: Project, file: PsiFile): DefaultMutableTreeNode? {
         val parentFilePath = file.virtualFile.toNioPath().parent
-        val usedSrc = setOf(file.name)
-
-        val root: Root? = getXmlRoot(file, project)
-        val treeRootNode = if (root != null) {
-            convertToTreeNode(root, parentFilePath, project, usedSrc)
-        } else null
-
-        window.treeModel.setRoot(treeRootNode)
+        return getXmlRoot(file, project)
+            ?.let { convertToTreeNode(it, parentFilePath, project, setOf(file.name)) }
     }
 
-    private fun findPsiFileByPath(path: Path, project: Project): PsiFile {
+    private fun findPsiFileByPath(path: Path, project: Project): PsiFile? {
         return VirtualFileManager.getInstance().findFileByNioPath(path)
             ?.let { PsiManager.getInstance(project).findFile(it) }
-            ?: throw RuntimeException("No internal ref file found")
     }
 
     private fun getXmlRoot(
