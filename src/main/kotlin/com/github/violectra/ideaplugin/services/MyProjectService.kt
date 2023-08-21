@@ -67,7 +67,7 @@ class MyProjectService(project: Project) : Disposable {
         window.treeModel.setRoot(treeRootNode)
     }
 
-    private fun findInternalRefFile(path: Path, project: Project): PsiFile {
+    private fun findPsiFileByPath(path: Path, project: Project): PsiFile {
         return VirtualFileManager.getInstance().findFileByNioPath(path)
             ?.let { PsiManager.getInstance(project).findFile(it) }
             ?: throw RuntimeException("No internal ref file found")
@@ -80,41 +80,32 @@ class MyProjectService(project: Project) : Disposable {
         DomManager.getDomManager(project).getFileElement(file, Root::class.java)?.rootElement
     } else null
 
-
     private fun convertToTreeNode(
-        root: MyNode,
+        node: MyNode,
         parentFilePath: Path,
         project: Project,
-        usedSrc: Set<String>
+        usedSrc: Set<String>,
     ): DefaultMutableTreeNode {
-        val newNode: DefaultMutableTreeNode
-        if (root is MyNodeWithChildren) {
-            newNode = DefaultMutableTreeNode(root)
-            for (child in root.getSubNodes()) {
-                newNode.add(convertToTreeNode(child, parentFilePath, project, usedSrc))
-            }
-        } else if (root is NodeRef) {
-            val srcFileName = root.getSrc().value ?: throw RuntimeException("No src for ref")
-            val path = parentFilePath.resolve(srcFileName)
-            val file = findInternalRefFile(path, project)
-            if (file.name !in usedSrc) {
-                val externalRoot: Root? = getXmlRoot(file, project)
-                if (externalRoot == null) {
-                    newNode = DefaultMutableTreeNode(root)
-                    MyNotifier.notifyError(project, "Ref file is not XML or doesn't have root element")
-                } else {
-                    newNode = DefaultMutableTreeNode(NodeRefWithExternalRoot(externalRoot, root))
-                    for (child in externalRoot.getSubNodes()) {
-                        newNode.add(convertToTreeNode(child, parentFilePath, project, usedSrc + file.name))
-                    }
-                }
-            } else {
-                newNode = DefaultMutableTreeNode(root)
-            }
+        val newNode = if (node is NodeRef) {
+            node.getSrc().value
+                ?.let { parentFilePath.resolve(it) }
+                ?.let { findPsiFileByPath(it, project) }
+                ?.takeIf { it.name !in usedSrc }
+                ?.let { getXmlRoot(it, project) }
+                ?.let { root -> NodeRefWithExternalRoot(root, node) } ?: node
         } else {
-            throw RuntimeException("Unknown node")
+            node
         }
-        return newNode
+        val treeNode = DefaultMutableTreeNode(newNode)
+        val updatedUsedSrc = if (newNode is NodeRefWithExternalRoot) {
+            newNode.ref.getSrc().value?.let { usedSrc + it } ?: usedSrc
+        } else usedSrc
+        if (newNode is MyNodeWithChildren) {
+            for (child in newNode.getSubNodes()) {
+                treeNode.add(convertToTreeNode(child, parentFilePath, project, updatedUsedSrc))
+            }
+        }
+        return treeNode
     }
 
     override fun dispose() {
