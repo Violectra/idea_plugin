@@ -11,6 +11,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
@@ -35,27 +36,16 @@ class MyProjectService(private val project: Project) : Disposable {
 
         messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
             fileEditorManager.selectedTextEditor?.document?.let {
-                psiDocumentManager.getPsiFile(it)?.let { psi ->
-                    showTree(psi)
+                psiDocumentManager.getPsiFile(it)?.let { psiFile ->
+                    showTree(psiFile)
                 }
             }
         })
     }
 
-    fun showTree(file: PsiFile) {
-        try {
-            window.treeModel.setRoot(readFileToTree(file))
-        } catch (e: Exception) {
-            MyNotifier.notifyError(project, e.message ?: "")
-        }
-    }
-
-    fun clearTree() {
-        try {
-            window.treeModel.setRoot(null)
-        } catch (e: Exception) {
-            MyNotifier.notifyError(project, e.message ?: "")
-        }
+    fun handleEditorFileSelectionChanged(file: VirtualFile) {
+        val psiFile = PsiManager.getInstance(project).findFile(file) ?: return
+        showTree(psiFile)
     }
 
     fun handleTreeNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
@@ -67,6 +57,22 @@ class MyProjectService(private val project: Project) : Disposable {
             } else {
                 XmlUtils.xmlInsertIntoPosition(movableNode.xmlElement, targetNode.xmlElement, isAfter)
             }
+        }
+    }
+
+    fun clearTree() {
+        setTreeRoot(null)
+    }
+
+    private fun showTree(file: PsiFile) {
+        setTreeRoot(readFileToTree(file))
+    }
+
+    private fun setTreeRoot(root: DefaultMutableTreeNode?) {
+        try {
+            window.treeModel.setRoot(root)
+        } catch (e: Exception) {
+            MyNotifier.notifyError(project, e.message ?: "")
         }
     }
 
