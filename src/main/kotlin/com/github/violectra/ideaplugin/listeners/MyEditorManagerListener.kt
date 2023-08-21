@@ -17,7 +17,7 @@ class MyEditorManagerListener : FileEditorManagerListener {
             val project = event.manager.project
             val myProjectService = project.service<MyProjectService>()
             val psiFile = PsiManager.getInstance(project).findFile(event.newFile) ?: return
-            myProjectService.showTree(project, psiFile)
+            myProjectService.showTree(psiFile)
         }
     }
 
@@ -25,6 +25,6 @@ class MyEditorManagerListener : FileEditorManagerListener {
         super.fileClosed(source, file)
 
         val myProjectService = source.project.service<MyProjectService>()
-        myProjectService.clearTree(source.project)
+        myProjectService.clearTree()
     }
 }

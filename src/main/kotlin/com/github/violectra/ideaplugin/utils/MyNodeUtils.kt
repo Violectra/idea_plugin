@@ -5,7 +5,13 @@ import com.github.violectra.ideaplugin.model.*
 class MyNodeUtils {
     companion object {
 
-        fun nodeToString(root: MyNode): String {
+        fun getMovableNode(node: MyNode): MyNode {
+            return if (node is RootWithExternalRef) node.nodeRef else node
+        }
+
+        fun objectToString(userObject: Any?) = if (userObject is MyNode) nodeToString(userObject) else null
+
+        private fun nodeToString(root: MyNode): String {
             val tag = getTag(root)
             return when (root) {
                 is RootWithExternalRef -> {

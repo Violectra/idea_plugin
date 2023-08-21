@@ -1,17 +1,16 @@
 package com.github.violectra.ideaplugin.utils
 
-import com.intellij.ui.RowsDnDSupport
 import javax.swing.tree.DefaultMutableTreeNode
 
-class NodeUtils {
+class TreeNodeUtils {
     companion object {
         fun calculateIndexWithPosition(
             targetTreeNode: DefaultMutableTreeNode,
             curTreeNode: DefaultMutableTreeNode,
-            position: RowsDnDSupport.RefinedDropSupport.Position
+            isBelow: Boolean
         ): Int {
             val intoIndex = calculateAboveIndex(targetTreeNode, curTreeNode)
-            return if (position == RowsDnDSupport.RefinedDropSupport.Position.BELOW) intoIndex + 1 else intoIndex
+            return if (isBelow) intoIndex + 1 else intoIndex
         }
 
         private fun calculateAboveIndex(target: DefaultMutableTreeNode, current: DefaultMutableTreeNode): Int {

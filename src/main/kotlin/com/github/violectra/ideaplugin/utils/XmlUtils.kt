@@ -1,7 +1,6 @@
 package com.github.violectra.ideaplugin.utils
 
 import com.intellij.psi.xml.XmlElement
-import com.intellij.ui.RowsDnDSupport
 
 class XmlUtils {
     companion object {
@@ -9,11 +8,11 @@ class XmlUtils {
         fun xmlInsertIntoPosition(
             current: XmlElement?,
             target: XmlElement?,
-            position: RowsDnDSupport.RefinedDropSupport.Position
+            isAfter: Boolean
         ) {
             current?.let { cur ->
                 target?.parent?.let { targetParent ->
-                    if (position == RowsDnDSupport.RefinedDropSupport.Position.BELOW) {
+                    if (isAfter) {
                         targetParent.addAfter(cur, target)
                     } else {
                         targetParent.addBefore(cur, target)
@@ -34,7 +33,6 @@ class XmlUtils {
                 }
             }
         }
-
 
     }
 }
