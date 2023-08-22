@@ -4,10 +4,10 @@ import com.github.violectra.ideaplugin.services.MyProjectService
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.github.violectra.ideaplugin.utils.TreeNodeUtils
 import com.intellij.ide.util.treeView.NodeRenderer
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.ui.*
+import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.EditableModel
 import com.intellij.util.ui.tree.TreeUtil
@@ -19,9 +19,8 @@ import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.MutableTreeNode
-import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position as Position
 
-class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
+class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
 
     internal val tree: Tree
     val treeModel: DefaultTreeModel
@@ -127,10 +126,6 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
             } else value
             super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
         }
-    }
-
-    override fun dispose() {
-        //todo
     }
 
 }

@@ -69,11 +69,7 @@ class MyProjectService(private val project: Project) : Disposable {
     }
 
     private fun setTreeRoot(root: DefaultMutableTreeNode?) {
-        try {
-            window.treeModel.setRoot(root)
-        } catch (e: Exception) {
-            MyNotifier.notifyError(project, e.message ?: "")
-        }
+        window.treeModel.setRoot(root)
     }
 
     private fun readFileToTree(file: PsiFile): DefaultMutableTreeNode? {
@@ -122,7 +118,6 @@ class MyProjectService(private val project: Project) : Disposable {
     }
 
     override fun dispose() {
-        window.dispose()
     }
 
 }
