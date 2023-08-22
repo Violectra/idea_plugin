@@ -1,10 +1,11 @@
 package com.github.violectra.ideaplugin.toolWindow
 
-import com.github.violectra.ideaplugin.services.MyProjectService
+import com.github.violectra.ideaplugin.model.ChangeTreeNotifier
+import com.github.violectra.ideaplugin.model.ReloadTreeNotifier
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.github.violectra.ideaplugin.utils.TreeNodeUtils
 import com.intellij.ide.util.treeView.NodeRenderer
-import com.intellij.openapi.components.service
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.ui.*
 import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position
@@ -20,7 +21,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.MutableTreeNode
 
-class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
+class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
     internal val tree: Tree
     val treeModel: DefaultTreeModel
@@ -38,6 +39,20 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
         treeScrollPane.preferredSize = Dimension(250, -1)
 
         add(treeDecorator.createPanel())
+
+        val messageBusConnection = project.messageBus.connect(this)
+        messageBusConnection.subscribe(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC,
+            object : ReloadTreeNotifier {
+                override fun handleTreeReloading(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
+                    if (isSameTree && root != null) {
+                        val expandedPaths = TreeUtil.collectExpandedPaths(tree)
+                        treeModel.setRoot(root)
+                        TreeUtil.restoreExpandedPaths(tree, expandedPaths)
+                    } else {
+                        treeModel.setRoot(root)
+                    }
+                }
+            })
     }
 
     inner class MyDndTreeModel(rootNode: DefaultMutableTreeNode?) : DefaultTreeModel(rootNode), EditableModel,
@@ -93,8 +108,10 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
                 val index = if (target.isNodeChild(current)) target.childCount - 1 else target.childCount
                 insertNodeInto(current, target, index)
             } else {
-                val index = TreeNodeUtils.calculateIndexWithPosition(target, current,
-                    position == Position.BELOW)
+                val index = TreeNodeUtils.calculateIndexWithPosition(
+                    target, current,
+                    position == Position.BELOW
+                )
                 insertNodeInto(current, target.parent as MutableTreeNode, index)
             }
         }
@@ -109,8 +126,8 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
             val isInto = position == Position.INTO
             val isAfter = position == Position.BELOW
 
-            val service = project.service<MyProjectService>()
-            service.handleTreeNodeInserting(current, target, isInto, isAfter)
+            val publisher = project.messageBus.syncPublisher(ChangeTreeNotifier.CHANGE_MY_TREE_TOPIC)
+            publisher.handleTreeNodeInserting(current, target, isInto, isAfter)
         }
 
         private fun getTreeNode(row: Int) = tree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
@@ -126,6 +143,9 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()) {
             } else value
             super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
         }
+    }
+
+    override fun dispose() {
     }
 
 }

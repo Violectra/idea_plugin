@@ -2,7 +2,6 @@ package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.model.*
-import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.github.violectra.ideaplugin.utils.XmlUtils
 import com.intellij.openapi.Disposable
@@ -25,7 +24,6 @@ import javax.swing.tree.DefaultMutableTreeNode
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(private val project: Project) : Disposable {
-    lateinit var window: MyToolWindow
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
@@ -37,18 +35,24 @@ class MyProjectService(private val project: Project) : Disposable {
         messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
             fileEditorManager.selectedTextEditor?.document?.let {
                 psiDocumentManager.getPsiFile(it)?.let { psiFile ->
-                    showTree(psiFile)
+                    reloadTree(psiFile, true)
                 }
             }
         })
+        messageBusConnection.subscribe(ChangeTreeNotifier.CHANGE_MY_TREE_TOPIC,
+            object : ChangeTreeNotifier {
+                override fun handleTreeNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
+                    handleNodeInserting(current, target, isInto, isAfter)
+                }
+            })
     }
 
     fun handleEditorFileSelectionChanged(file: VirtualFile) {
         val psiFile = PsiManager.getInstance(project).findFile(file) ?: return
-        showTree(psiFile)
+        reloadTree(psiFile, false)
     }
 
-    fun handleTreeNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
+    fun handleNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
         val movableNode = MyNodeUtils.getMovableNode(current as MyNode)
         val targetNode = target as MyNode
         WriteCommandAction.runWriteCommandAction(project) {
@@ -61,15 +65,16 @@ class MyProjectService(private val project: Project) : Disposable {
     }
 
     fun clearTree() {
-        setTreeRoot(null)
+        reloadTreeWithNewRoot(null, false)
     }
 
-    private fun showTree(file: PsiFile) {
-        setTreeRoot(readFileToTree(file))
+    private fun reloadTree(file: PsiFile, isSameTree: Boolean) {
+        reloadTreeWithNewRoot(readFileToTree(file), isSameTree)
     }
 
-    private fun setTreeRoot(root: DefaultMutableTreeNode?) {
-        window.treeModel.setRoot(root)
+    private fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
+        val publisher = project.messageBus.syncPublisher(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC)
+        publisher.handleTreeReloading(root, isSameTree)
     }
 
     private fun readFileToTree(file: PsiFile): DefaultMutableTreeNode? {
