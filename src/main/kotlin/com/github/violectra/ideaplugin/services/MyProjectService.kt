@@ -8,14 +8,10 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
-import com.intellij.psi.util.PsiModificationTracker
+import com.intellij.psi.*
 import com.intellij.psi.xml.XmlFile
 import com.intellij.util.xml.DomManager
 import java.nio.file.Path
@@ -29,16 +25,8 @@ class MyProjectService(private val project: Project) : Disposable {
         thisLogger().info(MyBundle.message("projectService", project.name))
 
         val messageBusConnection = project.messageBus.connect(this)
-        val fileEditorManager = FileEditorManager.getInstance(project)
-        val psiDocumentManager = PsiDocumentManager.getInstance(project)
 
-        messageBusConnection.subscribe(PsiModificationTracker.TOPIC, PsiModificationTracker.Listener {
-            fileEditorManager.selectedTextEditor?.document?.let {
-                psiDocumentManager.getPsiFile(it)?.let { psiFile ->
-                    reloadTree(psiFile, true)
-                }
-            }
-        })
+
         messageBusConnection.subscribe(ChangeTreeNotifier.CHANGE_MY_TREE_TOPIC,
             object : ChangeTreeNotifier {
                 override fun handleTreeNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
