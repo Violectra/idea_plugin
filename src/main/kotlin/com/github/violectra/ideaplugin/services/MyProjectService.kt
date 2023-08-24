@@ -2,6 +2,8 @@ package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.model.*
+import com.github.violectra.ideaplugin.toolWindow.MyPsiTreeChangeListener
+import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.github.violectra.ideaplugin.utils.XmlUtils
 import com.intellij.openapi.Disposable
@@ -33,6 +35,11 @@ class MyProjectService(private val project: Project) : Disposable {
                     handleNodeInserting(current, target, isInto, isAfter)
                 }
             })
+
+    }
+
+    fun startListener(window: MyToolWindow) {
+        PsiManager.getInstance(project).addPsiTreeChangeListener(MyPsiTreeChangeListener(project, window), this)
     }
 
     fun handleEditorFileSelectionChanged(file: VirtualFile) {
@@ -113,4 +120,22 @@ class MyProjectService(private val project: Project) : Disposable {
     override fun dispose() {
     }
 
+    fun createNewNodeAndRemoveOld(
+        currentNode: DefaultMutableTreeNode,
+        targetNode: DefaultMutableTreeNode
+    ) {
+        val movableNode = MyNodeUtils.getMovableNode(currentNode.userObject as MyNode)
+        WriteCommandAction.runWriteCommandAction(project) {
+            val copy = movableNode.xmlElement!!.copy()
+
+            val curXmlElement = MyNodeUtils.getMovableNode(currentNode.userObject as MyNode).xmlElement
+            curXmlElement?.delete()
+
+
+            val xmlElement = (targetNode.userObject as MyNode).xmlElement
+            xmlElement?.add(copy)
+
+            
+        }
+    }
 }

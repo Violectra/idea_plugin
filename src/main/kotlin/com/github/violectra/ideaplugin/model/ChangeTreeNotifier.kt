@@ -1,7 +1,7 @@
 package com.github.violectra.ideaplugin.model
 
 import com.intellij.util.messages.Topic
-
+import kotlin.Any
 
 
 interface ChangeTreeNotifier {

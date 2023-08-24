@@ -1,24 +1,18 @@
 package com.github.violectra.ideaplugin.toolWindow
 
-import com.github.violectra.ideaplugin.model.*
+import com.github.violectra.ideaplugin.model.ReloadTreeNotifier
+import com.github.violectra.ideaplugin.services.MyProjectService
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
-import com.github.violectra.ideaplugin.utils.TreeNodeUtils
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.getTreePath
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiTreeChangeAdapter
-import com.intellij.psi.PsiTreeChangeEvent
-import com.intellij.psi.xml.XmlTag
 import com.intellij.ui.*
 import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.EditableModel
 import com.intellij.util.ui.tree.TreeUtil
-import com.intellij.util.xml.DomManager
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JComponent
@@ -27,7 +21,7 @@ import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.MutableTreeNode
-import javax.swing.tree.TreePath
+import javax.swing.tree.TreeNode
 
 class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
@@ -48,64 +42,67 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
 
         add(treeDecorator.createPanel())
 
+
+
         val messageBusConnection = project.messageBus.connect(this)
 
-        //new file opened
         messageBusConnection.subscribe(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC,
             object : ReloadTreeNotifier {
-                override fun handleTreeReloading(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
+                override fun handleTreeReloading(root: TreeNode?, isSameTree: Boolean) {
                     if (!isSameTree) {
                         treeModel.setRoot(root)
                     }
                 }
+
+//                override fun handleTreeChanges() {
+//                    val expandedPaths = TreeUtil.collectExpandedPaths(tree)
+//                    treeModel.reload()
+//                    TreeUtil.restoreExpandedPaths(tree, expandedPaths)
+//                    tree.isEditable
+//                }
+//
+//                override fun handleChildAdded(
+//                    parentUserObject: Any,
+//                    newNode: MutableTreeNode,
+//                    index: Int
+//                ) {
+//                    val parentPath = treeModel.getTreePath(parentUserObject) ?: return
+//                    val parentTreeNode = parentPath.lastPathComponent as MutableTreeNode
+//                    treeModel.insertNodeInto(newNode, parentTreeNode, index)
+//                }
+//
+//                override fun handleChildRemoving(userObject: Any) {
+//                    val treePath = treeModel.getTreePath(userObject) ?: return
+//                    val treeNode = treePath.lastPathComponent as MutableTreeNode
+//                    treeModel.removeNodeFromParent(treeNode)
+//                }
             })
-
-        PsiManager.getInstance(project).addPsiTreeChangeListener(object : PsiTreeChangeAdapter() {
-
-            override fun childrenChanged(event: PsiTreeChangeEvent) {
-                val expandedPaths = TreeUtil.collectExpandedPaths(tree)
-                treeModel.reload()
-                TreeUtil.restoreExpandedPaths(tree, expandedPaths)
-            }
-
-            override fun childAdded(event: PsiTreeChangeEvent) {
-                val newChildElement = event.child
-                val parentElement = event.parent
-                if (newChildElement is XmlTag && parentElement is XmlTag) {
-                    val domManager = DomManager.getDomManager(project)
-                    val child = domManager.getDomElement(newChildElement)
-                    val parent = domManager.getDomElement(parentElement)
-                    if (child?.exists() == true) {
-                        return
-                    }
-                    if (child is MyNode && parent is MyNodeWithChildren) {
-                        val treePath = treeModel.getTreePath(parent) ?: return
-
-                        val indexOfNewElement = parent.getSubNodes().indexOf(child)
-                        val parentTreeNode =
-                            treePath.lastPathComponent as DefaultMutableTreeNode
-                        val newChild = DefaultMutableTreeNode(child, child !is NodeRef)
-                        treeModel.insertNodeInto(newChild, parentTreeNode, indexOfNewElement)
-                    }
-                }
-            }
-
-            override fun beforeChildRemoval(event: PsiTreeChangeEvent) {
-                val newChildElement = event.child
-                if (newChildElement is XmlTag) {
-                    val domManager = DomManager.getDomManager(project)
-                    val child = domManager.getDomElement(newChildElement)
-                    if (child is MyNode) {
-                        val treePath = treeModel.getTreePath(child) ?: return
-                        val childTreeNode =
-                            treePath.lastPathComponent as DefaultMutableTreeNode
-                        treeModel.removeNodeFromParent(childTreeNode)
-                    }
-                }
-            }
-        }, this);
+    }
 
 
+
+    fun handleTreeChanges() {
+        val expandedPaths = TreeUtil.collectExpandedPaths(tree)
+        treeModel.reload()
+        TreeUtil.restoreExpandedPaths(tree, expandedPaths)
+        tree.isEditable
+    }
+
+    fun handleChildAdded(
+        parentUserObject: Any,
+        newNode: MutableTreeNode,
+        index: Int
+    ) {
+        val parentPath = treeModel.getTreePath(parentUserObject) ?: return
+        val parentTreeNode = parentPath.lastPathComponent as MutableTreeNode
+
+        treeModel.insertNodeInto(newNode, parentTreeNode, minOf(index, parentTreeNode.childCount))
+    }
+
+    fun handleChildRemoving(userObject: Any) {
+        val treePath = treeModel.getTreePath(userObject) ?: return
+        val treeNode = treePath.lastPathComponent as MutableTreeNode
+        treeModel.removeNodeFromParent(treeNode)
     }
 
     inner class MyDndTreeModel(rootNode: DefaultMutableTreeNode?) : DefaultTreeModel(rootNode), EditableModel,
@@ -143,50 +140,10 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
             val currentNode = getTreeNode(currentTreeIndex)
             val targetNode = getTreeNode(targetTreeIndex)
 
-            WriteCommandAction.runWriteCommandAction(project) {
-                val movableNode = MyNodeUtils.getMovableNode(currentNode.userObject as MyNode)
-                val newPsi: PsiElement? = movableNode.xmlElement?.let { cur ->
-                    (targetNode.userObject as MyNode).xmlElement?.add(cur.copy())
-                }
-                val curCopyDomElement = DomManager.getDomManager(project).getDomElement(newPsi as XmlTag)
-                insertNodeInto(DefaultMutableTreeNode(curCopyDomElement), targetNode, targetNode.childCount)
+
+                val service = project.service<MyProjectService>()
                 removeNodeFromParent(currentNode)
-                movableNode.xmlElement?.delete()
-                treeModel.reload(targetNode)
-                tree.expandPath(TreePath(targetNode))
-            }
-        }
-
-        private fun insertTreeNode(
-            current: DefaultMutableTreeNode,
-            target: DefaultMutableTreeNode,
-            position: Position
-        ) {
-            if (position == Position.INTO) {
-                tree.expandPath(TreePath(target))
-                val index = if (target.isNodeChild(current)) target.childCount - 1 else target.childCount
-                insertNodeInto(current, target, index)
-            } else {
-                val index = TreeNodeUtils.calculateIndexWithPosition(
-                    target, current,
-                    position == Position.BELOW
-                )
-                insertNodeInto(current, target.parent as MutableTreeNode, index)
-            }
-        }
-
-        private fun handleInserting(
-            currentTreeNode: DefaultMutableTreeNode,
-            targetTreeNode: DefaultMutableTreeNode,
-            position: Position
-        ) {
-            val current = currentTreeNode.userObject
-            val target = targetTreeNode.userObject
-            val isInto = position == Position.INTO
-            val isAfter = position == Position.BELOW
-
-            val publisher = project.messageBus.syncPublisher(ChangeTreeNotifier.CHANGE_MY_TREE_TOPIC)
-            publisher.handleTreeNodeInserting(current, target, isInto, isAfter)
+                service.createNewNodeAndRemoveOld(currentNode, targetNode)
         }
 
         private fun getTreeNode(row: Int) = tree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode
