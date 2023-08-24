@@ -51,35 +51,20 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
                 override fun handleTreeReloading(root: TreeNode?, isSameTree: Boolean) {
                     if (!isSameTree) {
                         treeModel.setRoot(root)
+                    } else {
+                        treeModel.setRoot(root)
                     }
                 }
-
-//                override fun handleTreeChanges() {
-//                    val expandedPaths = TreeUtil.collectExpandedPaths(tree)
-//                    treeModel.reload()
-//                    TreeUtil.restoreExpandedPaths(tree, expandedPaths)
-//                    tree.isEditable
-//                }
-//
-//                override fun handleChildAdded(
-//                    parentUserObject: Any,
-//                    newNode: MutableTreeNode,
-//                    index: Int
-//                ) {
-//                    val parentPath = treeModel.getTreePath(parentUserObject) ?: return
-//                    val parentTreeNode = parentPath.lastPathComponent as MutableTreeNode
-//                    treeModel.insertNodeInto(newNode, parentTreeNode, index)
-//                }
-//
-//                override fun handleChildRemoving(userObject: Any) {
-//                    val treePath = treeModel.getTreePath(userObject) ?: return
-//                    val treeNode = treePath.lastPathComponent as MutableTreeNode
-//                    treeModel.removeNodeFromParent(treeNode)
-//                }
             })
     }
 
-
+    fun handleTreeChangesForSubtree(userObject: Any) {
+        val expandedPaths = TreeUtil.collectExpandedPaths(tree)
+        val treePath = treeModel.getTreePath(userObject)
+        treeModel.reload(treePath?.lastPathComponent as TreeNode)
+        TreeUtil.restoreExpandedPaths(tree, expandedPaths)
+        tree.isEditable
+    }
 
     fun handleTreeChanges() {
         val expandedPaths = TreeUtil.collectExpandedPaths(tree)
@@ -95,7 +80,6 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
     ) {
         val parentPath = treeModel.getTreePath(parentUserObject) ?: return
         val parentTreeNode = parentPath.lastPathComponent as MutableTreeNode
-
         treeModel.insertNodeInto(newNode, parentTreeNode, minOf(index, parentTreeNode.childCount))
     }
 

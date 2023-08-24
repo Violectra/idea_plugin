@@ -15,9 +15,12 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
 import com.intellij.psi.xml.XmlFile
+import com.intellij.util.xml.DomEventListener
 import com.intellij.util.xml.DomManager
+import com.intellij.util.xml.events.DomEvent
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.MutableTreeNode
 
 
 @Service(Service.Level.PROJECT)
@@ -25,6 +28,13 @@ class MyProjectService(private val project: Project) : Disposable {
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
+
+
+        DomManager.getDomManager(project).addDomEventListener(object : DomEventListener{
+            override fun eventOccured(event: DomEvent) {
+//                TODO("Not yet implemented")
+            }
+        } , this)
 
         val messageBusConnection = project.messageBus.connect(this)
 
@@ -42,9 +52,9 @@ class MyProjectService(private val project: Project) : Disposable {
         PsiManager.getInstance(project).addPsiTreeChangeListener(MyPsiTreeChangeListener(project, window), this)
     }
 
-    fun handleEditorFileSelectionChanged(file: VirtualFile) {
+    fun handleEditorFileSelectionChanged(file: VirtualFile, isSameTree: Boolean) {
         val psiFile = PsiManager.getInstance(project).findFile(file) ?: return
-        reloadTree(psiFile, false)
+        reloadTree(psiFile, isSameTree)
     }
 
     fun handleNodeInserting(current: Any, target: Any, isInto: Boolean, isAfter: Boolean) {
@@ -131,11 +141,23 @@ class MyProjectService(private val project: Project) : Disposable {
             val curXmlElement = MyNodeUtils.getMovableNode(currentNode.userObject as MyNode).xmlElement
             curXmlElement?.delete()
 
-
             val xmlElement = (targetNode.userObject as MyNode).xmlElement
             xmlElement?.add(copy)
-
-            
         }
+    }
+
+    fun convertToNodes(child: MyNode): MutableTreeNode {
+        val containingFile = child.xmlElement?.containingFile!!
+        val parentPath = containingFile.virtualFile.toNioPath().parent
+        val userSrc = mutableSetOf(containingFile.virtualFile.name)
+        var c: MyNode? = child
+        while (c != null) {
+            if(c is RootWithExternalRef) {
+                userSrc.plus(c.nodeRef.getSrc())
+            }
+            c = c.parent as? MyNode
+
+        }
+        return convertToTreeNode(child, parentPath!!, userSrc)
     }
 }

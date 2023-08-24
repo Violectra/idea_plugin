@@ -12,7 +12,7 @@ class MyEditorManagerListener : FileEditorManagerListener {
     override fun selectionChanged(event: FileEditorManagerEvent) {
         if (event.newFile != null) {
             val service = event.manager.project.service<MyProjectService>()
-            service.handleEditorFileSelectionChanged(event.newFile)
+            service.handleEditorFileSelectionChanged(event.newFile, false)
         }
     }
 
