@@ -73,11 +73,11 @@ class MyProjectService(private val project: Project) : Disposable {
         reloadTreeWithNewRoot(null, false)
     }
 
-    private fun reloadTree(file: PsiFile, isSameTree: Boolean) {
+    fun reloadTree(file: PsiFile, isSameTree: Boolean) {
         reloadTreeWithNewRoot(readFileToTree(file), isSameTree)
     }
 
-    private fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
+    public fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
         val publisher = project.messageBus.syncPublisher(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC)
         publisher.handleTreeReloading(root, isSameTree)
     }
@@ -146,7 +146,7 @@ class MyProjectService(private val project: Project) : Disposable {
         }
     }
 
-    fun convertToNodes(child: MyNode): MutableTreeNode {
+    fun convertToNodes(child: MyNode): DefaultMutableTreeNode {
         val containingFile = child.xmlElement?.containingFile!!
         val parentPath = containingFile.virtualFile.toNioPath().parent
         val userSrc = mutableSetOf(containingFile.virtualFile.name)
