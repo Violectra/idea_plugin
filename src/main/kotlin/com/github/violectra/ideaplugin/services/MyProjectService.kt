@@ -15,21 +15,16 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
 import com.intellij.psi.xml.XmlFile
-import com.intellij.util.xml.DomElement
-import com.intellij.util.xml.DomEventListener
 import com.intellij.util.xml.DomManager
-import com.intellij.util.xml.events.DomEvent
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.MutableTreeNode
-import javax.swing.tree.TreeNode
 
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(private val project: Project) : Disposable {
 
     lateinit var rootFile: PsiFile
-    val map = HashMap<MyNode, DefaultMutableTreeNode>()
+    private val map = HashMap<MyNode, DefaultMutableTreeNode>()
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
@@ -77,7 +72,7 @@ class MyProjectService(private val project: Project) : Disposable {
         reloadTreeWithNewRoot(readFileToTree(file), isSameTree)
     }
 
-    public fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
+    private fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?, isSameTree: Boolean) {
         val publisher = project.messageBus.syncPublisher(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC)
         publisher.handleTreeReloading(root, isSameTree)
     }
@@ -126,8 +121,8 @@ class MyProjectService(private val project: Project) : Disposable {
                 treeNode.add(convertToTreeNode(child, parentFilePath, updatedUsedSrc))
             }
         }
-        map.put(node, treeNode)
-        map.put(newNode, treeNode)
+        map[node] = treeNode
+        map[newNode] = treeNode
         return treeNode
     }
 
@@ -150,8 +145,6 @@ class MyProjectService(private val project: Project) : Disposable {
         }
     }
 
-
-
     fun convertToNodes(child: MyNode): DefaultMutableTreeNode {
         val containingFile = child.xmlElement?.containingFile!!
         val parentPath = containingFile.virtualFile.toNioPath().parent
@@ -168,8 +161,6 @@ class MyProjectService(private val project: Project) : Disposable {
     }
 
     fun getTreeNode(p: MyNode): DefaultMutableTreeNode? {
-        val map1 = map
-        val defaultMutableTreeNode = map1[p]
-        return defaultMutableTreeNode
+        return map[p]
     }
 }
