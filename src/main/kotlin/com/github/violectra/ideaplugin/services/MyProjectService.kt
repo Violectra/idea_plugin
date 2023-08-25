@@ -15,29 +15,26 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
 import com.intellij.psi.xml.XmlFile
+import com.intellij.util.xml.DomElement
 import com.intellij.util.xml.DomEventListener
 import com.intellij.util.xml.DomManager
 import com.intellij.util.xml.events.DomEvent
 import java.nio.file.Path
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.MutableTreeNode
+import javax.swing.tree.TreeNode
 
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(private val project: Project) : Disposable {
 
+    lateinit var rootFile: PsiFile
+    val map = HashMap<MyNode, DefaultMutableTreeNode>()
+
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
 
-
-        DomManager.getDomManager(project).addDomEventListener(object : DomEventListener{
-            override fun eventOccured(event: DomEvent) {
-//                TODO("Not yet implemented")
-            }
-        } , this)
-
         val messageBusConnection = project.messageBus.connect(this)
-
 
         messageBusConnection.subscribe(ChangeTreeNotifier.CHANGE_MY_TREE_TOPIC,
             object : ChangeTreeNotifier {
@@ -70,10 +67,13 @@ class MyProjectService(private val project: Project) : Disposable {
     }
 
     fun clearTree() {
+        map.clear()
         reloadTreeWithNewRoot(null, false)
     }
 
     fun reloadTree(file: PsiFile, isSameTree: Boolean) {
+        map.clear()
+        rootFile = file
         reloadTreeWithNewRoot(readFileToTree(file), isSameTree)
     }
 
@@ -98,6 +98,8 @@ class MyProjectService(private val project: Project) : Disposable {
     ) = if (file is XmlFile) {
         DomManager.getDomManager(project).getFileElement(file, Root::class.java)?.rootElement
     } else null
+
+
 
     private fun convertToTreeNode(
         node: MyNode,
@@ -124,6 +126,8 @@ class MyProjectService(private val project: Project) : Disposable {
                 treeNode.add(convertToTreeNode(child, parentFilePath, updatedUsedSrc))
             }
         }
+        map.put(node, treeNode)
+        map.put(newNode, treeNode)
         return treeNode
     }
 
@@ -146,6 +150,8 @@ class MyProjectService(private val project: Project) : Disposable {
         }
     }
 
+
+
     fun convertToNodes(child: MyNode): DefaultMutableTreeNode {
         val containingFile = child.xmlElement?.containingFile!!
         val parentPath = containingFile.virtualFile.toNioPath().parent
@@ -159,5 +165,11 @@ class MyProjectService(private val project: Project) : Disposable {
 
         }
         return convertToTreeNode(child, parentPath!!, userSrc)
+    }
+
+    fun getTreeNode(p: MyNode): DefaultMutableTreeNode? {
+        val map1 = map
+        val defaultMutableTreeNode = map1[p]
+        return defaultMutableTreeNode
     }
 }
