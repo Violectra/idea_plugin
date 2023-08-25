@@ -7,12 +7,10 @@ import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.getTreePath
 import com.intellij.ui.*
 import com.intellij.ui.RowsDnDSupport.RefinedDropSupport.Position
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.EditableModel
-import com.intellij.util.ui.tree.TreeUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.JComponent
@@ -20,7 +18,6 @@ import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.MutableTreeNode
 import javax.swing.tree.TreeNode
 
 class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
@@ -56,37 +53,6 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
                     }
                 }
             })
-    }
-
-    fun handleTreeChangesForSubtree(userObject: Any) {
-        val expandedPaths = TreeUtil.collectExpandedPaths(tree)
-        val treePath = treeModel.getTreePath(userObject)
-        treeModel.reload(treePath?.lastPathComponent as TreeNode)
-        TreeUtil.restoreExpandedPaths(tree, expandedPaths)
-        tree.isEditable
-    }
-
-    fun handleTreeChanges() {
-        val expandedPaths = TreeUtil.collectExpandedPaths(tree)
-        treeModel.reload()
-        TreeUtil.restoreExpandedPaths(tree, expandedPaths)
-        tree.isEditable
-    }
-
-    fun handleChildAdded(
-        parentUserObject: Any,
-        newNode: MutableTreeNode,
-        index: Int
-    ) {
-        val parentPath = treeModel.getTreePath(parentUserObject) ?: return
-        val parentTreeNode = parentPath.lastPathComponent as MutableTreeNode
-        treeModel.insertNodeInto(newNode, parentTreeNode, minOf(index, parentTreeNode.childCount))
-    }
-
-    fun handleChildRemoving(userObject: Any) {
-        val treePath = treeModel.getTreePath(userObject) ?: return
-        val treeNode = treePath.lastPathComponent as MutableTreeNode
-        treeModel.removeNodeFromParent(treeNode)
     }
 
     inner class MyDndTreeModel(rootNode: DefaultMutableTreeNode?) : DefaultTreeModel(rootNode), EditableModel,
