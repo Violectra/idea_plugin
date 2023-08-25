@@ -78,13 +78,13 @@ class MyPsiTreeChangeListener(private val project: Project, private val window: 
         val service = project.service<MyProjectService>()
         val rootContainingFile = service.rootFile
         if (element is XmlDocument || window.treeModel.root == null || rootContainingFile != element.containingFile) {
-            service.reloadTree(rootContainingFile, true)
+            service.reloadTreeForCurrentFile()
             return
         }
 
         val affectedNode = getAffectedNode(element) ?: return
         if (affectedNode is Root) {
-            service.reloadTree(rootContainingFile, true)
+            service.reloadTreeForCurrentFile()
             return
         }
 

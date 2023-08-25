@@ -12,7 +12,6 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow factoryClass="com.github.violectra.ideaplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow" anchor="right"/>
         <dom.fileMetaData implementation="com.github.violectra.ideaplugin.MyDomFileDescription" rootTagName="root"/>
-        <typedHandler implementation="com.github.violectra.ideaplugin.MyTypedHandler"/>
     </extensions>
 
     <projectListeners>

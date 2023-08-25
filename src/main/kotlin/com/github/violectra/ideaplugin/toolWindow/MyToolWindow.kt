@@ -1,6 +1,6 @@
 package com.github.violectra.ideaplugin.toolWindow
 
-import com.github.violectra.ideaplugin.model.ReloadTreeNotifier
+import com.github.violectra.ideaplugin.listeners.ReloadTreeListener
 import com.github.violectra.ideaplugin.services.MyProjectService
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.intellij.ide.util.treeView.NodeRenderer
@@ -39,18 +39,13 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
 
         add(treeDecorator.createPanel())
 
-
-
         val messageBusConnection = project.messageBus.connect(this)
 
-        messageBusConnection.subscribe(ReloadTreeNotifier.RELOAD_MY_TREE_TOPIC,
-            object : ReloadTreeNotifier {
-                override fun handleTreeReloading(root: TreeNode?, isSameTree: Boolean) {
-                    if (!isSameTree) {
-                        treeModel.setRoot(root)
-                    } else {
-                        treeModel.setRoot(root)
-                    }
+        messageBusConnection.subscribe(
+            ReloadTreeListener.RELOAD_MY_TREE_TOPIC,
+            object : ReloadTreeListener {
+                override fun handleTreeReloading(root: TreeNode?) {
+                    treeModel.setRoot(root)
                 }
             })
     }
@@ -89,11 +84,8 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
         override fun drop(currentTreeIndex: Int, targetTreeIndex: Int, position: Position) {
             val currentNode = getTreeNode(currentTreeIndex)
             val targetNode = getTreeNode(targetTreeIndex)
-
-
-                val service = project.service<MyProjectService>()
-                removeNodeFromParent(currentNode)
-                service.createNewNodeAndRemoveOld(currentNode, targetNode)
+            removeNodeFromParent(currentNode)
+            project.service<MyProjectService>().insertPsiElement(currentNode.userObject, targetNode.userObject)
         }
 
         private fun getTreeNode(row: Int) = tree.getPathForRow(row).lastPathComponent as DefaultMutableTreeNode

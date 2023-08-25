@@ -11,13 +11,11 @@ class MyEditorManagerListener : FileEditorManagerListener {
 
     override fun selectionChanged(event: FileEditorManagerEvent) {
         if (event.newFile != null) {
-            val service = event.manager.project.service<MyProjectService>()
-            service.handleEditorFileSelectionChanged(event.newFile, false)
+            event.manager.project.service<MyProjectService>().reloadTreeForNewFile(event.newFile)
         }
     }
 
     override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-        val service = source.project.service<MyProjectService>()
-        service.clearTree()
+        source.project.service<MyProjectService>().clearTree()
     }
 }
