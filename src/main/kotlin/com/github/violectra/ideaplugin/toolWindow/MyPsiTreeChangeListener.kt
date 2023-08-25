@@ -75,35 +75,28 @@ class MyPsiTreeChangeListener(private val project: Project, private val window: 
     }
 
     private fun reloadAffectedSubTree(element: PsiElement) {
-
-        if (element is XmlDocument) {
-            window.treeModel.setRoot(null)
-            project.service<MyProjectService>().reloadTree(element.containingFile, true)
-            return
-        }
-        val rootContainingFile = project.service<MyProjectService>().rootFile
-
-        if (rootContainingFile != element.containingFile) {
-            window.treeModel.setRoot(null)
-            project.service<MyProjectService>().reloadTree(rootContainingFile, true)
+        val service = project.service<MyProjectService>()
+        val rootContainingFile = service.rootFile
+        if (element is XmlDocument || window.treeModel.root == null || rootContainingFile != element.containingFile) {
+            service.reloadTree(rootContainingFile, true)
             return
         }
 
         val affectedNode = getAffectedNode(element) ?: return
         if (affectedNode is Root) {
-            window.treeModel.setRoot(null)
-            project.service<MyProjectService>().reloadTree(rootContainingFile, true)
+            service.reloadTree(rootContainingFile, true)
             return
         }
+
         val affectedParentTreeNode: DefaultMutableTreeNode =
-            project.service<MyProjectService>().getTreeNode(affectedNode.parent as MyNode)
+            service.getTreeNode(affectedNode.parent as MyNode)
                 ?: throw RuntimeException("Node is broken")
-        val indexOf =
-            (affectedNode.parent as MyNodeWithChildren).getSubNodes().indexOf(affectedNode as MyNodeWithIdAttribute)
-        val affectedTreeNode: DefaultMutableTreeNode? =
-            project.service<MyProjectService>().getTreeNode(affectedNode as MyNode)
+
+        val indexOf = (affectedNode.parent as MyNodeWithChildren).getSubNodes()
+            .indexOf(affectedNode as MyNodeWithIdAttribute)
+        val affectedTreeNode: DefaultMutableTreeNode? = service.getTreeNode(affectedNode as MyNode)
         affectedTreeNode?.let { if (affectedTreeNode.parent != null) window.treeModel.removeNodeFromParent(it) }
-        val newChild = project.service<MyProjectService>().convertToNodes(affectedNode)
+        val newChild = service.convertToNodes(affectedNode)
         window.treeModel.insertNodeInto(newChild, affectedParentTreeNode, indexOf)
         window.treeModel.getTreePath(newChild).let { window.tree.expandPath(it) }
     }
@@ -114,8 +107,7 @@ class MyPsiTreeChangeListener(private val project: Project, private val window: 
             cur = cur.parent
         }
         if (cur == null) return null
-        val domManager = DomManager.getDomManager(project)
-        val curElement = domManager.getDomElement(cur as XmlTag)
+        val curElement = DomManager.getDomManager(project).getDomElement(cur as XmlTag)
         return if (curElement is MyNode) curElement else null
     }
 }
