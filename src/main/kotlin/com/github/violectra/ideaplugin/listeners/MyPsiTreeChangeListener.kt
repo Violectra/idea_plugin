@@ -1,114 +1,50 @@
 package com.github.violectra.ideaplugin.listeners
 
-import com.github.violectra.ideaplugin.model.*
 import com.github.violectra.ideaplugin.services.MyProjectService
-import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.getTreePath
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiTreeChangeAdapter
 import com.intellij.psi.PsiTreeChangeEvent
 import com.intellij.psi.PsiWhiteSpace
-import com.intellij.psi.xml.XmlDocument
-import com.intellij.psi.xml.XmlTag
-import com.intellij.util.xml.DomManager
-import javax.swing.tree.DefaultMutableTreeNode
+import com.intellij.psi.util.elementType
+import com.intellij.psi.xml.XmlToken
+import com.intellij.psi.xml.XmlTokenType
 
-class MyPsiTreeChangeListener(private val project: Project, private val window: MyToolWindow) : PsiTreeChangeAdapter() {
-
-    override fun beforeChildReplacement(event: PsiTreeChangeEvent) {
-        if (event.newChild is PsiWhiteSpace && event.newChild is PsiWhiteSpace) return
-        val eventParent = event.parent
-        if (eventParent is XmlDocument) {
-            val oldChild = event.oldChild
-            if (oldChild is XmlTag && event.newChild is XmlTag) {
-                val oldChildDom = DomManager.getDomManager(project).getDomElement(oldChild)
-                if (oldChildDom is Root) {
-                    window.treeModel.setRoot(null)
-                }
-            }
-        } else {
-            val nodeToReload = getAffectedNode(event.parent) ?: return
-            val affected: DefaultMutableTreeNode =
-                project.service<MyProjectService>().getTreeNode(nodeToReload) ?: return
-            if (!affected.isRoot) {
-                window.treeModel.removeNodeFromParent(affected)
-            } else {
-                window.treeModel.setRoot(null)
-            }
-        }
-    }
+class MyPsiTreeChangeListener(private val project: Project) : PsiTreeChangeAdapter() {
 
     override fun childReplaced(event: PsiTreeChangeEvent) {
         if (event.newChild == null || event.newChild is PsiWhiteSpace) return
+        if (event.child is XmlToken && event.child.elementType == XmlTokenType.XML_DATA_CHARACTERS) {
+            reloadTree()
+            return
+        }
         reloadAffectedSubTree(event.parent)
     }
 
     override fun childAdded(event: PsiTreeChangeEvent) {
         if (event.child == null || event.child is PsiWhiteSpace) return
+        if (event.child is XmlToken && event.child.elementType == XmlTokenType.XML_DATA_CHARACTERS) {
+            reloadTree()
+            return
+        }
         reloadAffectedSubTree(event.parent)
     }
 
-    override fun beforeChildRemoval(event: PsiTreeChangeEvent) {
-        if (event.child == null || event.child is PsiWhiteSpace) return
-        val newChildElement = event.child
-        val parentElement = event.parent
-        if (parentElement is XmlDocument && newChildElement is XmlTag) {
-            window.treeModel.setRoot(null)
-        } else if (newChildElement is XmlTag) {
-            val nodeToReload = getAffectedNode(event.child) ?: return
-            val affected: DefaultMutableTreeNode =
-                project.service<MyProjectService>().getTreeNode(nodeToReload) ?: return
-            if (!affected.isRoot) {
-                window.treeModel.removeNodeFromParent(affected)
-            } else {
-                window.treeModel.setRoot(null)
-            }
-        }
-    }
-
     override fun childRemoved(event: PsiTreeChangeEvent) {
-        if (event.child == null || event.child is PsiWhiteSpace) return
-        if (event.child is XmlTag) {
-            reloadAffectedSubTree(event.parent)
+        if (event.child is XmlToken && event.child.elementType == XmlTokenType.XML_DATA_CHARACTERS) {
+            reloadTree()
+            return
         }
+        reloadAffectedSubTree(event.parent)
     }
 
     private fun reloadAffectedSubTree(element: PsiElement) {
-        val service = project.service<MyProjectService>()
-        val rootContainingFile = service.rootFile
-        if (element is XmlDocument || window.treeModel.root == null || rootContainingFile != element.containingFile) {
-            service.reloadTreeForCurrentFile()
-            return
-        }
-
-        val affectedNode = getAffectedNode(element) ?: return
-        if (affectedNode is Root) {
-            service.reloadTreeForCurrentFile()
-            return
-        }
-
-        val affectedParentTreeNode: DefaultMutableTreeNode =
-            service.getTreeNode(affectedNode.parent as MyNode)
-                ?: throw RuntimeException("Node is broken")
-
-        val indexOf = (affectedNode.parent as MyNodeWithChildren).getSubNodes()
-            .indexOf(affectedNode as MyNodeWithIdAttribute)
-        val affectedTreeNode: DefaultMutableTreeNode? = service.getTreeNode(affectedNode as MyNode)
-        affectedTreeNode?.let { if (affectedTreeNode.parent != null) window.treeModel.removeNodeFromParent(it) }
-        val newChild = service.convertToNodes(affectedNode)
-        window.treeModel.insertNodeInto(newChild, affectedParentTreeNode, indexOf)
-        window.treeModel.getTreePath(newChild).let { window.tree.expandPath(it) }
+        project.service<MyProjectService>().reloadAffectedSubTree(element)
     }
 
-    private fun getAffectedNode(element: PsiElement?): MyNode? {
-        var cur: PsiElement? = element ?: return null
-        while (cur != null && cur !is XmlTag) {
-            cur = cur.parent
-        }
-        if (cur == null) return null
-        val curElement = DomManager.getDomManager(project).getDomElement(cur as XmlTag)
-        return if (curElement is MyNode) curElement else null
+    private fun reloadTree() {
+        project.service<MyProjectService>().reloadTree()
     }
+
 }

@@ -1,10 +1,9 @@
 package com.github.violectra.ideaplugin.services
 
 import com.github.violectra.ideaplugin.*
+import com.github.violectra.ideaplugin.listeners.MyPsiTreeChangeListener
 import com.github.violectra.ideaplugin.listeners.ReloadTreeListener
 import com.github.violectra.ideaplugin.model.*
-import com.github.violectra.ideaplugin.listeners.MyPsiTreeChangeListener
-import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.command.WriteCommandAction
@@ -14,7 +13,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.*
-import com.intellij.psi.xml.XmlFile
+import com.intellij.psi.xml.*
 import com.intellij.util.xml.DomElement
 import com.intellij.util.xml.DomManager
 import java.nio.file.Path
@@ -24,15 +23,12 @@ import javax.swing.tree.DefaultMutableTreeNode
 @Service(Service.Level.PROJECT)
 class MyProjectService(private val project: Project) : Disposable {
 
-    lateinit var rootFile: PsiFile
+    private lateinit var rootFile: PsiFile
     private val treeNodesByDomNodes = HashMap<MyNode, DefaultMutableTreeNode>()
 
     init {
         thisLogger().info(MyBundle.message("projectService", project.name))
-    }
-
-    fun startListener(window: MyToolWindow) {
-        PsiManager.getInstance(project).addPsiTreeChangeListener(MyPsiTreeChangeListener(project, window), this)
+        PsiManager.getInstance(project).addPsiTreeChangeListener(MyPsiTreeChangeListener(project), this)
     }
 
     fun reloadTreeForNewFile(file: VirtualFile) {
@@ -45,17 +41,64 @@ class MyProjectService(private val project: Project) : Disposable {
         reloadTreeWithNewRoot(null)
     }
 
-    fun reloadTreeForCurrentFile() {
+    fun insertPsiElement(currentNode: Any, targetNode: Any) {
+        val movableNode: DomElement = MyNodeUtils.getMovableNode(currentNode as MyNode)
+        val target = targetNode as DomElement
+        WriteCommandAction.runWriteCommandAction(project) {
+            val copy = movableNode.xmlElement?.copy() ?: return@runWriteCommandAction
+            movableNode.xmlElement?.delete()
+            target.xmlElement?.add(copy)
+        }
+    }
+
+    fun reloadTree() {
+        project.messageBus.syncPublisher(ReloadTreeListener.RELOAD_MY_TREE_TOPIC)
+            .reloadTree()
+    }
+
+    fun reloadAffectedSubTree(element: PsiElement) {
+        if (element is XmlDocument || rootFile != element.containingFile) {
+            reloadTreeForCurrentFile()
+            return
+        }
+
+        val affectedNode = getAffectedNode(element)
+        if (affectedNode == null) {
+            reloadTree()
+            return
+        }
+        if (affectedNode.xmlElement is XmlDocument || affectedNode.parent.xmlElement is XmlFile) {
+            reloadTreeForCurrentFile()
+            return
+        }
+
+        val affectedTreeNode = getTreeNode(affectedNode)
+        val newNode = convertToTreeNodes(affectedNode)
+        if (affectedTreeNode != null && affectedTreeNode.parent != null) {
+            project.messageBus.syncPublisher(ReloadTreeListener.RELOAD_MY_TREE_TOPIC)
+                .substituteTreeNode(affectedTreeNode, newNode)
+        } else {
+            val parentTreeNode = getTreeNode(affectedNode.parent)
+                ?: throw RuntimeException("Parent node not found")
+            val index = (affectedNode.parent as MyNodeWithChildren).getSubNodes()
+                .indexOf(affectedNode as MyNodeWithIdAttribute)
+            project.messageBus.syncPublisher(ReloadTreeListener.RELOAD_MY_TREE_TOPIC)
+                .addTreeNode(parentTreeNode, newNode, index)
+        }
+    }
+
+    private fun reloadTreeForCurrentFile() {
         reloadTreeForFile(rootFile)
     }
 
     private fun reloadTreeForFile(file: PsiFile) {
-        treeNodesByDomNodes.clear()
         rootFile = file
+        treeNodesByDomNodes.clear()
         reloadTreeWithNewRoot(readDomStructureTreeNode(file))
     }
 
     private fun reloadTreeWithNewRoot(root: DefaultMutableTreeNode?) {
+
         project.messageBus.syncPublisher(ReloadTreeListener.RELOAD_MY_TREE_TOPIC).handleTreeReloading(root)
     }
 
@@ -106,20 +149,11 @@ class MyProjectService(private val project: Project) : Disposable {
         return treeNode
     }
 
-    fun insertPsiElement(currentNode: Any, targetNode: Any) {
-        val movableNode: DomElement = MyNodeUtils.getMovableNode(currentNode as MyNode)
-        val target = targetNode as DomElement
-        WriteCommandAction.runWriteCommandAction(project) {
-            val copy = movableNode.xmlElement?.copy() ?: return@runWriteCommandAction
-            movableNode.xmlElement?.delete()
-            target.xmlElement?.add(copy)
-        }
-    }
-
-    fun convertToNodes(child: MyNode): DefaultMutableTreeNode {
+    private fun convertToTreeNodes(child: DomElement): DefaultMutableTreeNode {
+        val node = child as MyNode
+        val userSrc = calculateUsedSrcForNode(node)
         val parentPath = rootFile.virtualFile.toNioPath().parent
-        val userSrc = calculateUsedSrcForNode(child)
-        return convertToTreeNode(child, parentPath!!, userSrc)
+        return convertToTreeNode(node, parentPath!!, userSrc)
     }
 
     private fun calculateUsedSrcForNode(child: MyNode): Set<String> {
@@ -134,8 +168,22 @@ class MyProjectService(private val project: Project) : Disposable {
         return userSrc
     }
 
-    fun getTreeNode(p: MyNode): DefaultMutableTreeNode? {
-        return treeNodesByDomNodes[p]
+    private fun getTreeNode(p: DomElement): DefaultMutableTreeNode? {
+        return treeNodesByDomNodes[p as MyNode]
+    }
+
+    private fun getAffectedNode(element: PsiElement?): DomElement? {
+        var cur: PsiElement? = element ?: return null
+        while (cur != null) {
+            if (cur is XmlTag) {
+                val tag = DomManager.getDomManager(project).getDomElement(cur)
+                if (tag != null) {
+                    return tag
+                }
+            }
+            cur = cur.parent
+        }
+        return null
     }
 
     override fun dispose() {

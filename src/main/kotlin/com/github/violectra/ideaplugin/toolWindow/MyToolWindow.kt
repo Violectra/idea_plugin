@@ -18,15 +18,15 @@ import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.MutableTreeNode
 import javax.swing.tree.TreeNode
 
 class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
     internal val tree: Tree
-    val treeModel: MyDndTreeModel
+    val treeModel: MyDndTreeModel = MyDndTreeModel(null)
 
     init {
-        treeModel = MyDndTreeModel(null)
         tree = Tree(treeModel)
         tree.cellRenderer = MyCellRenderer { node: DefaultMutableTreeNode ->
             MyNodeUtils.objectToString(node.userObject)
@@ -46,6 +46,21 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
             object : ReloadTreeListener {
                 override fun handleTreeReloading(root: TreeNode?) {
                     treeModel.setRoot(root)
+                }
+
+                override fun substituteTreeNode(oldNode: MutableTreeNode, newNode: MutableTreeNode) {
+                    val parent = oldNode.parent as MutableTreeNode
+                    val index = oldNode.parent.getIndex(oldNode)
+                    treeModel.removeNodeFromParent(oldNode)
+                    treeModel.insertNodeInto(newNode, parent, index)
+                }
+
+                override fun addTreeNode(parent: MutableTreeNode, newNode: MutableTreeNode, index: Int) {
+                    treeModel.insertNodeInto(newNode, parent, index)
+                }
+
+                override fun reloadTree() {
+                    treeModel.reload()
                 }
             })
     }
@@ -84,7 +99,6 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
         override fun drop(currentTreeIndex: Int, targetTreeIndex: Int, position: Position) {
             val currentNode = getTreeNode(currentTreeIndex)
             val targetNode = getTreeNode(targetTreeIndex)
-            removeNodeFromParent(currentNode)
             project.service<MyProjectService>().insertPsiElement(currentNode.userObject, targetNode.userObject)
         }
 
@@ -97,7 +111,11 @@ class MyToolWindow(private val project: Project) : JPanel(BorderLayout()), Dispo
             tree: JTree, value: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean
         ) {
             val newValue = if (value is DefaultMutableTreeNode) {
-                converterFunction(value) ?: value
+                try {
+                    converterFunction(value) ?: value
+                } catch (e: Throwable) {
+                    "DELETED"
+                }
             } else value
             super.customizeCellRenderer(tree, newValue, selected, expanded, leaf, row, hasFocus)
         }
