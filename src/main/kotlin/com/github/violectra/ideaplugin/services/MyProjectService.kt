@@ -3,7 +3,7 @@ package com.github.violectra.ideaplugin.services
 import com.github.violectra.ideaplugin.*
 import com.github.violectra.ideaplugin.listeners.ReloadTreeListener
 import com.github.violectra.ideaplugin.model.*
-import com.github.violectra.ideaplugin.toolWindow.MyPsiTreeChangeListener
+import com.github.violectra.ideaplugin.listeners.MyPsiTreeChangeListener
 import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.github.violectra.ideaplugin.utils.MyNodeUtils
 import com.intellij.openapi.Disposable

@@ -1,7 +1,8 @@
-package com.github.violectra.ideaplugin.toolWindow
+package com.github.violectra.ideaplugin.listeners
 
 import com.github.violectra.ideaplugin.model.*
 import com.github.violectra.ideaplugin.services.MyProjectService
+import com.github.violectra.ideaplugin.toolWindow.MyToolWindow
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.getTreePath
