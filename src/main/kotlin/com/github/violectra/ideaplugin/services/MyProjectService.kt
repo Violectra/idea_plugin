@@ -24,7 +24,7 @@ import javax.swing.tree.DefaultMutableTreeNode
 @Service(Service.Level.PROJECT)
 class MyProjectService(private val project: Project) : Disposable {
 
-    @Volatile var treeRoot: DefaultMutableTreeNode? = null
+    var treeRoot: DefaultMutableTreeNode? = null
     private lateinit var rootFile: PsiFile
     private val treeNodesByDomNodes = HashMap<MyNode, DefaultMutableTreeNode>()
 
