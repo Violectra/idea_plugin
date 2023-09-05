@@ -13,7 +13,6 @@ interface ReloadTreeListener {
 
     fun handleTreeReloading(root: TreeNode?)
     fun substituteTreeNode(oldNode: MutableTreeNode, newNode: DefaultMutableTreeNode)
-
     fun addTreeNode(parent: MutableTreeNode, newNode: DefaultMutableTreeNode, index: Int)
     fun reloadTree()
 }
